@@ -3,6 +3,7 @@ project(drm_tests)
 
 add_executable(test test.c)
 add_executable(drm_info drm_info.c)
+add_executable(drm_dumb_bo drm_dumb_bo.c)
 
 # find headers
 
@@ -59,3 +60,4 @@ include_directories(${GL_INCLUDE_DIR})
 
 target_link_libraries(test ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
 target_link_libraries(drm_info ${DRM_LIBRARY} ${GBM_LIBRARY})
+target_link_libraries(drm_dumb_bo ${DRM_LIBRARY})
