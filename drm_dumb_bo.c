@@ -15,13 +15,9 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-/* */
+#include "drm_utils.h"
 
-struct kms {
-	drmModeConnector *connector;
-	drmModeEncoder *encoder;
-	drmModeModeInfo mode;
-};
+/* */
 
 struct dumb_rb {
 	uint32_t fb;
@@ -37,69 +33,9 @@ static const char device_name[] = "/dev/dri/card0";
 
 /* */
 
-bool find_drm_configuration(int fd, struct kms *kms)
-{
-	drmModeConnector *connector;
-	drmModeEncoder *encoder;
-	drmModeRes *resources;
-
-	int i;
-
-	resources = drmModeGetResources(fd);
-	if (!resources) {
-		fprintf(stderr, "drmModeGetResources failed\n");
-		return false;
-	}
-
-	for (i = 0; i < resources->count_connectors; i++) {
-		connector = drmModeGetConnector(fd, resources->connectors[i]);
-		if (connector == NULL)
-			continue;
-
-		if (connector->connection == DRM_MODE_CONNECTED && connector->count_modes > 0)
-			break;
-
-		drmModeFreeConnector(connector);
-	}
-
-	if (i == resources->count_connectors) {
-		fprintf(stderr, "No currently active connector found\n");
-		return false;
-	}
-
-	for (i = 0; i < resources->count_encoders; i++) {
-		encoder = drmModeGetEncoder(fd, resources->encoders[i]);
-
-		if (encoder == NULL)
-			continue;
-
-		if (encoder->encoder_id == connector->encoder_id)
-			break;
-
-		drmModeFreeEncoder(encoder);
-	}
-
-	if (i == resources->count_encoders) {
-        fprintf(stderr, "No matching encoder for connector found\n");
-		goto drm_free_connector;
-    }
-
-
-	kms->connector = connector;
-	kms->encoder = encoder;
-	kms->mode = connector->modes[0];
-
-	return true;
-
-drm_free_connector:
-	drmModeFreeConnector(connector);
-
-	return false;
-}
-
 int main(char argc, char *argv[])
 {
-	struct kms kms_data;
+	struct kms_display kms_data;
 	struct dumb_rb dbo;
 	uint64_t has_dumb;
 	int ret, fd;
