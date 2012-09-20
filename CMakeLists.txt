@@ -5,6 +5,7 @@ add_executable(test test.c)
 add_executable(drm_info drm_info.c)
 add_executable(drm_dumb_bo drm_dumb_bo.c drm_utils.c)
 add_executable(drm_dumb_bo_libkms drm_dumb_bo_libkms.c drm_utils.c)
+add_executable(drm_gl_simple drm_gl_simple.c drm_utils.c)
 
 # find headers
 
@@ -71,6 +72,7 @@ include_directories(${GL_INCLUDE_DIR})
 # set libraries paths
 
 target_link_libraries(test ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+target_link_libraries(drm_gl_simple ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
 target_link_libraries(drm_info ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
 target_link_libraries(drm_dumb_bo ${DRM_LIBRARY})
 target_link_libraries(drm_dumb_bo_libkms ${KMS_LIBRARY})
