@@ -28,9 +28,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <fcntl.h>
 
-#include <gbm.h>
 #include <drm.h>
 #include <xf86drmMode.h>
 
@@ -188,7 +188,6 @@ int main(int argc, char *argv[])
 	drmModeEncoder *encoder;
     drmModeRes *resources;
 
-    struct gbm_device *gbm;
     int i, fd, ret;
 
     fd = open(device_name, O_RDWR);
@@ -196,13 +195,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "couldn't open %s, skipping\n", device_name);
 		ret = -1;
 		goto exit;
-    }
-
-    gbm = gbm_create_device(fd);
-    if (gbm == NULL) {
-        fprintf(stderr, "couldn't create gbm device\n");
-        ret = -1;
-        goto close_fd;
     }
 
 	/* From xf86drmMode.h:
@@ -231,7 +223,7 @@ int main(int argc, char *argv[])
     if (!resources) {
         fprintf(stderr, "drmModeGetResources failed\n");
 		ret = -1;
-		goto destroy_gbm_device;
+		goto close_fd;
     }
 
 
@@ -254,9 +246,6 @@ int main(int argc, char *argv[])
         drmModeFreeEncoder(encoder);
     }
 
-
-destroy_gbm_device:
-    gbm_device_destroy(gbm);
 
 close_fd:
     close(fd);
