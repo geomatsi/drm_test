@@ -97,6 +97,17 @@ static const char device_name[] = "/dev/dri/card0";
 
 /* */
 
+void crtc_info(drmModeRes *resources, drmModeCrtc *crtc)
+{
+	printf("\ncrtc [id = %u]\n", crtc->crtc_id);
+	printf("\tbuffer [id = %u]\n", crtc->buffer_id);
+	printf("\tposition: %xx%x @ %xx%x\n", crtc->width, crtc->height, crtc->x, crtc->y);
+	if (crtc->mode_valid)
+		printf("\tMode: valid [%s]\n", crtc->mode.name);
+	else
+		printf("\tMode: invalid\n");
+}
+
 void connector_info(drmModeRes *resources, drmModeConnector *connector)
 {
 	drmModeModeInfo *mode;
@@ -178,12 +189,14 @@ void encoder_info(drmModeRes *resources, drmModeEncoder *encoder)
 
 	printf("\nEncoder [id = %u]\n", encoder->encoder_id);
 	printf("\ttype [%s]\n", encoder_type_str(encoder->encoder_type));
+	printf("\tCrtc [id = %u]\n", encoder->crtc_id);
 
 	return;
 }
 
 int main(int argc, char *argv[])
 {
+    drmModeCrtc *crtc;
     drmModeConnector *connector;
 	drmModeEncoder *encoder;
     drmModeRes *resources;
@@ -226,6 +239,15 @@ int main(int argc, char *argv[])
 		goto close_fd;
     }
 
+
+    for (i = 0; i < resources->count_crtcs; i++) {
+        crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
+        if (crtc == NULL)
+            continue;
+
+		crtc_info(resources, crtc);
+        drmModeFreeCrtc(crtc);
+    }
 
     for (i = 0; i < resources->count_connectors; i++) {
         connector = drmModeGetConnector(fd, resources->connectors[i]);
