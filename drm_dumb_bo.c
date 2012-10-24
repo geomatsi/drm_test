@@ -26,6 +26,7 @@ struct dumb_rb {
 	uint32_t handle;
 	uint32_t stride;
 	uint64_t size;
+
 	void *map;
 };
 
