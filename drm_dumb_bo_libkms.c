@@ -16,6 +16,7 @@
 #include <xf86drm.h>
 #include <libkms.h>
 
+#include "draw_utils.h"
 #include "drm_utils.h"
 
 /* */
@@ -132,30 +133,10 @@ int main(char argc, char *argv[])
 
 	/* draw on the screen */
 
-	do {
+    draw_test_image((uint32_t *) dst, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
+	getchar();
 
-		uint32_t color32[] = {
-			0x000000FF, 0x0000FF00, 0x00FF0000,
-			0x00FF00FF, 0x00FFFF00, 0x0000FFFF,
-		};
-
-		uint32_t h = kms_data.mode->vdisplay;
-		uint32_t w = kms_data.mode->hdisplay;
-		uint32_t color;
-		int i, j;
-
-		for(i = 0; i < h; i++ ){
-
-			color = color32[6*i/h];
-
-			for(j = 0; j < w; j++) {
-				*(dst + i*w + j) = color;
-			}
-		}
-
-		getchar();
-
-	} while(0);
+    /* restore original crtc settings */
 
     ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
             saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);

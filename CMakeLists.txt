@@ -3,8 +3,8 @@ project(drm_tests)
 
 add_executable(test test.c)
 add_executable(drm_info drm_info.c)
-add_executable(drm_dumb_bo drm_dumb_bo.c drm_utils.c)
-add_executable(drm_dumb_bo_libkms drm_dumb_bo_libkms.c drm_utils.c)
+add_executable(drm_dumb_bo drm_dumb_bo.c drm_utils.c draw_utils.c)
+add_executable(drm_dumb_bo_libkms drm_dumb_bo_libkms.c drm_utils.c draw_utils.c)
 add_executable(drm_gl_simple drm_gl_simple.c drm_utils.c)
 
 # find headers

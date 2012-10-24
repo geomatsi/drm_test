@@ -17,6 +17,7 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+#include "draw_utils.h"
 #include "drm_utils.h"
 
 /* */
@@ -148,31 +149,8 @@ int main(char argc, char *argv[])
 
 	/* draw on the screen */
 
-	do {
-
-		uint32_t color32[] = {
-			0x000000FF, 0x0000FF00, 0x00FF0000,
-			0x00FF00FF, 0x00FFFF00, 0x0000FFFF,
-		};
-
-		uint32_t *dst = (uint32_t *) dbo.map;
-		uint32_t h = kms_data.mode->vdisplay;
-		uint32_t w = kms_data.mode->hdisplay;
-		uint32_t color;
-		int i, j;
-
-		for(i = 0; i < h; i++ ){
-
-			color = color32[6*i/h];
-
-			for(j = 0; j < w; j++) {
-				*(dst + i*w + j) = color;
-			}
-		}
-
-		getchar();
-
-	} while(0);
+    draw_test_image((uint32_t *) dbo.map, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
+	getchar();
 
 	/* restore old crtc */
 
