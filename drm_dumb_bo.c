@@ -1,3 +1,5 @@
+#define _FILE_OFFSET_BITS 64
+
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -46,11 +48,7 @@ int main(char argc, char *argv[])
 
     drmModeCrtcPtr saved_crtc;
 
-
 	memset(&dbo, 0, sizeof(dbo));
-	memset(&mreq, 0, sizeof(mreq));
-	memset(&creq, 0, sizeof(creq));
-	memset(&dreq, 0, sizeof(dreq));
 
 	fd = open(device_name, O_RDWR | O_CLOEXEC);
 	if (fd < 0) {
@@ -59,18 +57,6 @@ int main(char argc, char *argv[])
 	}
 
 	drmSetMaster(fd);
-
-	if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0) {
-		perror("failed drmGetCap(DRM_CAP_DUMB_BUFFER)");
-		ret = -EFAULT;
-		goto err_close;
-	}
-
-	if (!has_dumb) {
-		fprintf(stderr, "driver does not support dumb buffers\n");
-		ret = -EFAULT;
-		goto err_close;
-	}
 
 	/* try DRM auto configuration */
 
@@ -82,8 +68,23 @@ int main(char argc, char *argv[])
 
     dump_drm_configuration(&kms_data);
 
+    /* check dumb buffer support */
+
+    if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0) {
+		perror("failed drmGetCap(DRM_CAP_DUMB_BUFFER)");
+		ret = -EFAULT;
+		goto err_close;
+	}
+
+	if (!has_dumb) {
+		fprintf(stderr, "driver does not support dumb buffers\n");
+		ret = -EFAULT;
+		goto err_close;
+	}
+
 	/* create dumb buffer object */
 
+	memset(&creq, 0, sizeof(creq));
 	creq.height = kms_data.mode->vdisplay;
 	creq.width = kms_data.mode->hdisplay;
 	creq.bpp = 32;
@@ -98,19 +99,9 @@ int main(char argc, char *argv[])
 	dbo.stride = creq.pitch;
 	dbo.size = creq.size;
 
-	/* create framebuffer for dumb buffer object */
-
-	ret = drmModeAddFB(fd, kms_data.mode->hdisplay, kms_data.mode->vdisplay,
-		24, 32, dbo.stride, dbo.handle, &dbo.fb);
-	if (ret) {
-		perror("failed drmModeAddFB()\n");
-		goto err_destroy;
-	}
-
-    drmModeDirtyFB(fd, dbo.fb, NULL, 0);
-
 	/* map dumb buffer object */
 
+	memset(&mreq, 0, sizeof(mreq));
 	mreq.handle = dbo.handle;
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
@@ -124,6 +115,15 @@ int main(char argc, char *argv[])
 		perror("failed mmap()");
 		ret = -EFAULT;
 		goto err_fb;
+	}
+
+    /* create framebuffer for dumb buffer object */
+
+	ret = drmModeAddFB(fd, kms_data.mode->hdisplay, kms_data.mode->vdisplay,
+		24, 32, dbo.stride, dbo.handle, &dbo.fb);
+	if (ret) {
+		perror("failed drmModeAddFB()\n");
+		goto err_destroy;
 	}
 
 	/* store current crtc */
@@ -142,6 +142,8 @@ int main(char argc, char *argv[])
         perror("failed drmModeSetCrtc(new)");
 		goto err_unmap;
 	}
+
+    drmModeDirtyFB(fd, dbo.fb, NULL, 0);
 
 	/* draw on the screen */
 
@@ -184,7 +186,10 @@ err_fb:
     drmModeRmFB(fd, dbo.fb);
 
 err_destroy:
+
+	memset(&dreq, 0, sizeof(dreq));
 	dreq.handle = dbo.handle;
+
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
 	if (ret) {
 		fprintf(stderr, "cannot destroy dumb buffer");
