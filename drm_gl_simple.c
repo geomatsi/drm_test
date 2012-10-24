@@ -32,7 +32,6 @@
 #define GL_GLEXT_PROTOTYPES
 
 #include <GL/gl.h>
-#include <GL/glu.h>
 #include <GL/glext.h>
 
 #include <EGL/egl.h>
@@ -127,11 +126,13 @@ int main(int argc, char *argv[])
 
 	/* Find the first available KMS configuration */
 
-	if (!find_drm_configuration(fd, &kms)) {
+	if (!drm_autoconf(fd, &kms)) {
 		fprintf(stderr, "failed to setup KMS\n");
 		ret = -EFAULT;
 		goto close_fd;
 	}
+
+    dump_drm_configuration(&kms);
 
 	/* Init EGL and create EGL context */
 
@@ -200,7 +201,7 @@ int main(int argc, char *argv[])
 	glGenRenderbuffers(1, &rfb);
 	glBindRenderbuffer(GL_RENDERBUFFER, rfb);
 
-	bo = gbm_bo_create(gbm, kms.mode.hdisplay, kms.mode.vdisplay,
+	bo = gbm_bo_create(gbm, kms.mode->hdisplay, kms.mode->vdisplay,
 			GBM_BO_FORMAT_XRGB8888, GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 
 	if (bo == NULL) {
@@ -224,29 +225,28 @@ int main(int argc, char *argv[])
 	handle = gbm_bo_get_handle(bo).u32;
 	stride = gbm_bo_get_pitch(bo);
 
-	ret = drmModeAddFB(fd, kms.mode.hdisplay, kms.mode.vdisplay,
+	ret = drmModeAddFB(fd, kms.mode->hdisplay, kms.mode->vdisplay,
 			24, 32, stride, handle, &fb_id);
 
 	if (ret) {
-		fprintf(stderr, "failed to create fb\n");
+        perror("failed drmModeAddFB()");
 		goto rm_rb;
 	}
 
 	/* store original crtc */
 
-	saved_crtc = drmModeGetCrtc(fd, kms.encoder->crtc_id);
+	saved_crtc = drmModeGetCrtc(fd, kms.crtc->crtc_id);
 	if (saved_crtc == NULL) {
-		fprintf(stderr, "failed to get current mode\n");
+        perror("failed drmModeGetCrtc(current)");
 		goto rm_fb;
 	}
 
 	/* set new crtc: display DRM framebuffer */
 
-	ret = drmModeSetCrtc(fd, kms.encoder->crtc_id, fb_id, 0, 0,
-			&kms.connector->connector_id, 1, &kms.mode);
+	ret = drmModeSetCrtc(fd, kms.crtc->crtc_id, fb_id, 0, 0, &kms.connector->connector_id, 1, kms.mode);
 
 	if (ret) {
-		fprintf(stderr, "failed to set mode: %m\n");
+        perror("failed drmModeSetCrtc(new)");
 		goto free_saved_crtc;
 	}
 
@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
 	 */
 
     for(i = 0; i < 10; i++) {
-		render_stuff(kms.mode.hdisplay, kms.mode.vdisplay, angle);
+		render_stuff(kms.mode->hdisplay, kms.mode->vdisplay, angle);
         angle += 1.0;
 		(void) getchar();
 	}
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
 			saved_crtc->x, saved_crtc->y, &kms.connector->connector_id, 1, &saved_crtc->mode);
 
 	if (ret) {
-		fprintf(stderr, "failed to restore crtc: %m\n");
+        perror("failed drmModeSetCrtc(restore original)");
 	}
 
 	/* cleanup */

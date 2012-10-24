@@ -43,6 +43,7 @@ int main(char argc, char *argv[])
     struct drm_mode_destroy_dumb dreq;
 	struct drm_mode_create_dumb creq;
 	struct drm_mode_map_dumb mreq;
+
     drmModeCrtcPtr saved_crtc;
 
 
@@ -57,10 +58,10 @@ int main(char argc, char *argv[])
 		exit(-1);
 	}
 
-	drmDropMaster(fd);
+	drmSetMaster(fd);
 
 	if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0) {
-		perror("DRM_CAP_DUMB_BUFFER ioctl");
+		perror("failed drmGetCap(DRM_CAP_DUMB_BUFFER)");
 		ret = -EFAULT;
 		goto err_close;
 	}
@@ -71,23 +72,25 @@ int main(char argc, char *argv[])
 		goto err_close;
 	}
 
-	/* find current DRM configuration */
+	/* try DRM auto configuration */
 
-	if (!find_drm_configuration(fd, &kms_data)) {
+	if (!drm_autoconf(fd, &kms_data)) {
 		fprintf(stderr, "failed to setup KMS\n");
 		ret = -EFAULT;
 		goto err_close;
 	}
 
+    dump_drm_configuration(&kms_data);
+
 	/* create dumb buffer object */
 
-	creq.height = kms_data.mode.vdisplay;
-	creq.width = kms_data.mode.hdisplay;
+	creq.height = kms_data.mode->vdisplay;
+	creq.width = kms_data.mode->hdisplay;
 	creq.bpp = 32;
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq);
 	if (ret) {
-		fprintf(stderr, "failed drmIoctl(DRM_IOCTL_MODE_CREATE_DUMB)\n");
+		perror("failed drmIoctl(DRM_IOCTL_MODE_CREATE_DUMB)\n");
 		goto err_close;
 	}
 
@@ -97,12 +100,14 @@ int main(char argc, char *argv[])
 
 	/* create framebuffer for dumb buffer object */
 
-	ret = drmModeAddFB(fd, kms_data.mode.hdisplay, kms_data.mode.vdisplay,
+	ret = drmModeAddFB(fd, kms_data.mode->hdisplay, kms_data.mode->vdisplay,
 		24, 32, dbo.stride, dbo.handle, &dbo.fb);
 	if (ret) {
-		fprintf(stderr, "cannot add drm framebuffer for dumb buffer object\n");
+		perror("failed drmModeAddFB()\n");
 		goto err_destroy;
 	}
+
+    drmModeDirtyFB(fd, dbo.fb, NULL, 0);
 
 	/* map dumb buffer object */
 
@@ -110,31 +115,31 @@ int main(char argc, char *argv[])
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
 	if (ret) {
-		fprintf(stderr, "failed drmIoctl(DRM_IOCTL_MODE_MAP_DUMB)\n");
+		perror("failed drmIoctl(DRM_IOCTL_MODE_MAP_DUMB)");
 		goto err_fb;
 	}
 
 	dbo.map = mmap(0, dbo.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mreq.offset);
 	if (dbo.map == MAP_FAILED) {
-		fprintf(stderr, "cannot mmap dumb buffer\n");
+		perror("failed mmap()");
 		ret = -EFAULT;
 		goto err_fb;
 	}
 
 	/* store current crtc */
 
-    saved_crtc = drmModeGetCrtc(fd, kms_data.encoder->crtc_id);
+    saved_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
     if (saved_crtc == NULL) {
-        fprintf(stderr, "failed to get current mode\n");
+        perror("failed drmModeGetCrtc(current)");
         goto err_unmap;
     }
 
 	/* setup new crtc */
 
-    ret = drmModeSetCrtc(fd, kms_data.encoder->crtc_id, dbo.fb, 0, 0,
-            &kms_data.connector->connector_id, 1, &kms_data.mode);
+    ret = drmModeSetCrtc(fd, kms_data.crtc->crtc_id, dbo.fb, 0, 0,
+            &kms_data.connector->connector_id, 1, kms_data.mode);
 	if (ret) {
-		fprintf(stderr, "cannot set new drm crtc");
+        perror("failed drmModeSetCrtc(new)");
 		goto err_unmap;
 	}
 
@@ -148,8 +153,8 @@ int main(char argc, char *argv[])
 		};
 
 		uint32_t *dst = (uint32_t *) dbo.map;
-		uint32_t h = kms_data.mode.vdisplay;
-		uint32_t w = kms_data.mode.hdisplay;
+		uint32_t h = kms_data.mode->vdisplay;
+		uint32_t w = kms_data.mode->hdisplay;
 		uint32_t color;
 		int i, j;
 

@@ -41,7 +41,7 @@ int main(char argc, char *argv[])
 		KMS_WIDTH, 0,
 		KMS_HEIGHT, 0,
 		KMS_BO_TYPE, KMS_BO_TYPE_SCANOUT_X8R8G8B8,
-		KMS_TERMINATE_PROP_LIST, 0
+		KMS_TERMINATE_PROP_LIST
 	};
 
 	fd = open(device_name, O_RDWR | O_CLOEXEC);
@@ -50,24 +50,28 @@ int main(char argc, char *argv[])
 		exit(-1);
 	}
 
+    drmSetMaster(fd);
+
 	/* find current DRM configuration */
 
-	if (!find_drm_configuration(fd, &kms_data)) {
+	if (!drm_autoconf(fd, &kms_data)) {
 		fprintf(stderr, "failed to setup KMS\n");
 		ret = -EFAULT;
 		goto err_close;
 	}
 
+    dump_drm_configuration(&kms_data);
+
 	/* set display dimensions for chosen configuration */
 
-	attr[1] = kms_data.mode.hdisplay;
-	attr[3] = kms_data.mode.vdisplay;
+	attr[1] = kms_data.mode->hdisplay;
+	attr[3] = kms_data.mode->vdisplay;
 
 	/* create kms driver */
 
 	ret = kms_create(fd, &drv);
 	if (ret) {
-		fprintf(stderr, "failed to setup kms driver\n");
+		perror("failed kms_create()");
 		goto err_close;
 	}
 
@@ -75,19 +79,19 @@ int main(char argc, char *argv[])
 
 	ret = kms_bo_create(drv, attr, &bo);
 	if (ret) {
-		fprintf(stderr, "failed to create dumb bo\n");
+		perror("failed kms_bo_create()");
 		goto err_driver_destroy;
 	}
 
 	ret = kms_bo_get_prop(bo, KMS_PITCH, &stride);
 	if (ret) {
-		fprintf(stderr, "failed to get attrs of dumb bo\n");
+		perror("failed kms_bo_get_prop(KMS_PITCH)");
 		goto err_buffer_destroy;
 	}
 
 	ret = kms_bo_get_prop(bo, KMS_HANDLE, &handle);
 	if (ret) {
-		fprintf(stderr, "failed to get attrs of dumb bo\n");
+		perror("failed kms_bo_get_prop(KMS_HANDLE)");
 		goto err_buffer_destroy;
 	}
 
@@ -95,34 +99,36 @@ int main(char argc, char *argv[])
 
 	ret = kms_bo_map(bo, (void **) &dst);
 	if (ret) {
-		fprintf(stderr, "failed to map buffer object\n");
+		perror("failed kms_bo_map()");
 		goto err_buffer_destroy;
 	}
 
 	/* create drm framebuffer */
 
-	ret = drmModeAddFB(fd, kms_data.mode.hdisplay, kms_data.mode.vdisplay, 24, 32, stride, handle, &fb);
+	ret = drmModeAddFB(fd, kms_data.mode->hdisplay, kms_data.mode->vdisplay, 24, 32, stride, handle, &fb);
 	if (ret) {
-		fprintf(stderr, "cannot add drm framebuffer for dumb buffer object\n");
+		perror("failed drmModeAddFB()");
 		goto err_buffer_unmap;
 	}
 
 	/* store current crtc */
 
-    saved_crtc = drmModeGetCrtc(fd, kms_data.encoder->crtc_id);
+    saved_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
     if (saved_crtc == NULL) {
-        fprintf(stderr, "failed to get current mode\n");
+		perror("failed drmModeGetCrtc(current)");
         goto err_buffer_unmap;
     }
 
 	/* setup new crtc */
 
-    ret = drmModeSetCrtc(fd, kms_data.encoder->crtc_id, fb, 0, 0,
-            &kms_data.connector->connector_id, 1, &kms_data.mode);
+    ret = drmModeSetCrtc(fd, kms_data.crtc->crtc_id, fb, 0, 0,
+            &kms_data.connector->connector_id, 1, kms_data.mode);
 	if (ret) {
-		fprintf(stderr, "cannot set new drm crtc");
+		perror("failed drmModeSetCrtc(new)");
 		goto err_buffer_unmap;
-	}
+    }
+
+    drmModeDirtyFB(fd, fb, NULL, 0);
 
 	/* draw on the screen */
 
@@ -133,8 +139,8 @@ int main(char argc, char *argv[])
 			0x00FF00FF, 0x00FFFF00, 0x0000FFFF,
 		};
 
-		uint32_t h = kms_data.mode.vdisplay;
-		uint32_t w = kms_data.mode.hdisplay;
+		uint32_t h = kms_data.mode->vdisplay;
+		uint32_t w = kms_data.mode->hdisplay;
 		uint32_t color;
 		int i, j;
 
@@ -160,19 +166,19 @@ err_fb:
 err_buffer_unmap:
 	ret = kms_bo_unmap(bo);
 	if (ret) {
-		fprintf(stderr, "cannot unmap dumb buffer");
+		perror("failed kms_bo_unmap(new)");
 	}
 
 err_buffer_destroy:
 	ret = kms_bo_destroy(&bo);
 	if (ret) {
-		fprintf(stderr, "cannot destroy dumb buffer");
+		perror("failed kms_bo_destroy(new)");
 	}
 
 err_driver_destroy:
 	ret = kms_destroy(&drv);
 	if (ret) {
-		fprintf(stderr, "cannot destroy kms driver");
+		perror("failed kms_destroy(new)");
 	}
 
 err_close:

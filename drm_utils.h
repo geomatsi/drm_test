@@ -20,9 +20,11 @@
 struct kms_display {
 	drmModeConnector *connector;
 	drmModeEncoder *encoder;
-	drmModeModeInfo mode;
+	drmModeModeInfo *mode;
+	drmModeCrtc *crtc;
 };
 
 /* */
 
 bool find_drm_configuration(int fd, struct kms_display *kms);
+void dump_drm_configuration(struct kms_display *kms);
