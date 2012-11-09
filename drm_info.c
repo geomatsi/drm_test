@@ -99,6 +99,23 @@ static const char device_name[] = "/dev/dri/card0";
 
 void crtc_info(drmModeRes *resources, drmModeCrtc *crtc)
 {
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModeCrtc {
+		uint32_t crtc_id;
+		uint32_t buffer_id; // FB id to connect to 0 = disconnect
+
+		uint32_t x, y; // Position on the framebuffer
+		uint32_t width, height;
+		int mode_valid;
+		drmModeModeInfo mode;
+
+		int gamma_size; // Number of gamma stops
+
+	} drmModeCrtc, *drmModeCrtcPtr;
+
+	*/
+
 	printf("\ncrtc [id = %u]\n", crtc->crtc_id);
 	printf("\tbuffer [id = %u]\n", crtc->buffer_id);
 	printf("\tposition: %xx%x @ %xx%x\n", crtc->width, crtc->height, crtc->x, crtc->y);
@@ -172,8 +189,9 @@ void connector_info(drmModeRes *resources, drmModeConnector *connector)
 	return;
 }
 
-void encoder_info(drmModeRes *resources, drmModeEncoder *encoder)
+void encoder_info(drmModeRes *resources, drmModeEncoder *encoder, drmModeCrtc **crtcs)
 {
+	int i;
 
 	/* From xf86drmMode.h:
 
@@ -191,12 +209,82 @@ void encoder_info(drmModeRes *resources, drmModeEncoder *encoder)
 	printf("\ttype [%s]\n", encoder_type_str(encoder->encoder_type));
 	printf("\tCrtc [id = %u]\n", encoder->crtc_id);
 
+	printf("\tSupported crtc:");
+	for (i = 0; i < 31; i++)
+		if (encoder->possible_crtcs & (1 << i)) {
+			if (crtcs[i] != NULL)
+				printf(" [id = %d]", crtcs[i]->crtc_id);
+			else
+				printf(" [#%d, ??]",  i);
+		}
+	printf("\n");
+
 	return;
+}
+
+void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
+{
+	int i;
+
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModePlane {
+		uint32_t count_formats;
+		uint32_t *formats;
+		uint32_t plane_id;
+
+		uint32_t crtc_id;
+		uint32_t fb_id;
+
+		uint32_t crtc_x, crtc_y;
+		uint32_t x, y;
+
+		uint32_t possible_crtcs;
+		uint32_t gamma_size;
+	} drmModePlane, *drmModePlanePtr;
+	*/
+	printf("\nPlane [id = %u]\n", plane->plane_id);
+	printf("\tFB ID [id = %u]\n", plane->fb_id);
+	printf("\tcrtc ID [id = %u]\n", plane->crtc_id);
+
+	printf("\tCRTC XxY %ux%x\n", plane->crtc_x, plane->crtc_y);
+	printf("\tXxY %ux%x\n", plane->x, plane->y);
+	printf("\tSupported crtc:");
+	for (i = 0; i < 31; i++)
+		if (plane->possible_crtcs & (1 << i)) {
+			if (crtcs[i] != NULL)
+				printf(" [id = %d]", crtcs[i]->crtc_id);
+			else
+				printf(" [#%d, ??]",  i);
+		}
+	printf("\n");
+}
+
+void planes_info(int fd, drmModeCrtc **crtcs)
+{
+	drmModePlaneRes *plane_resources;
+	int i;
+
+	plane_resources = drmModeGetPlaneResources(fd);
+	if (!plane_resources) {
+		fprintf(stderr, "Error getting plane resources\n");
+		return;
+	}
+
+	for (i = 0; i < plane_resources->count_planes; i++) {
+		drmModePlane *plane = drmModeGetPlane(fd, plane_resources->planes[i]);
+		if (!plane)
+			continue;
+
+		plane_info(plane, crtcs);
+
+		drmModeFreePlane(plane);
+	}
 }
 
 int main(int argc, char *argv[])
 {
-    drmModeCrtc *crtc;
+    drmModeCrtcPtr *crtcs;
     drmModeConnector *connector;
 	drmModeEncoder *encoder;
     drmModeRes *resources;
@@ -240,13 +328,13 @@ int main(int argc, char *argv[])
     }
 
 
+    crtcs = calloc(32, sizeof(drmModeCrtcPtr));
     for (i = 0; i < resources->count_crtcs; i++) {
-        crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
-        if (crtc == NULL)
+        crtcs[i] = drmModeGetCrtc(fd, resources->crtcs[i]);
+        if (crtcs[i] == NULL)
             continue;
 
-		crtc_info(resources, crtc);
-        drmModeFreeCrtc(crtc);
+		crtc_info(resources, crtcs[i]);
     }
 
     for (i = 0; i < resources->count_connectors; i++) {
@@ -264,10 +352,17 @@ int main(int argc, char *argv[])
         if (encoder == NULL)
             continue;
 
-		encoder_info(resources, encoder);
+		encoder_info(resources, encoder, crtcs);
         drmModeFreeEncoder(encoder);
     }
 
+	planes_info(fd, crtcs);
+
+	for (i = 0; i < resources->count_crtcs; i++) {
+		if (crtcs[i] != NULL)
+			drmModeFreeCrtc(crtcs[i]);
+	}
+	free(crtcs);
 
 close_fd:
     close(fd);
