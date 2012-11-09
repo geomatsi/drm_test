@@ -172,8 +172,9 @@ void connector_info(drmModeRes *resources, drmModeConnector *connector)
 	return;
 }
 
-void encoder_info(drmModeRes *resources, drmModeEncoder *encoder)
+void encoder_info(drmModeRes *resources, drmModeEncoder *encoder, drmModeCrtc **crtcs)
 {
+	int i;
 
 	/* From xf86drmMode.h:
 
@@ -191,12 +192,22 @@ void encoder_info(drmModeRes *resources, drmModeEncoder *encoder)
 	printf("\ttype [%s]\n", encoder_type_str(encoder->encoder_type));
 	printf("\tCrtc [id = %u]\n", encoder->crtc_id);
 
+	printf("\tSupported crtc:");
+	for (i = 0; i < 31; i++)
+		if (encoder->possible_crtcs & (1 << i)) {
+			if (crtcs[i] != NULL)
+				printf(" [id = %d]", crtcs[i]->crtc_id);
+			else
+				printf(" [#%d, ??]",  i);
+		}
+	printf("\n");
+
 	return;
 }
 
 int main(int argc, char *argv[])
 {
-    drmModeCrtc *crtc;
+    drmModeCrtcPtr *crtcs;
     drmModeConnector *connector;
 	drmModeEncoder *encoder;
     drmModeRes *resources;
@@ -240,13 +251,13 @@ int main(int argc, char *argv[])
     }
 
 
+    crtcs = calloc(32, sizeof(drmModeCrtcPtr));
     for (i = 0; i < resources->count_crtcs; i++) {
-        crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
-        if (crtc == NULL)
+        crtcs[i] = drmModeGetCrtc(fd, resources->crtcs[i]);
+        if (crtcs[i] == NULL)
             continue;
 
-		crtc_info(resources, crtc);
-        drmModeFreeCrtc(crtc);
+		crtc_info(resources, crtcs[i]);
     }
 
     for (i = 0; i < resources->count_connectors; i++) {
@@ -264,10 +275,15 @@ int main(int argc, char *argv[])
         if (encoder == NULL)
             continue;
 
-		encoder_info(resources, encoder);
+		encoder_info(resources, encoder, crtcs);
         drmModeFreeEncoder(encoder);
     }
 
+	for (i = 0; i < resources->count_crtcs; i++) {
+		if (crtcs[i] != NULL)
+			drmModeFreeCrtc(crtcs[i]);
+	}
+	free(crtcs);
 
 close_fd:
     close(fd);
