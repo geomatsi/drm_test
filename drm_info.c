@@ -99,6 +99,23 @@ static const char device_name[] = "/dev/dri/card0";
 
 void crtc_info(drmModeRes *resources, drmModeCrtc *crtc)
 {
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModeCrtc {
+		uint32_t crtc_id;
+		uint32_t buffer_id; // FB id to connect to 0 = disconnect
+
+		uint32_t x, y; // Position on the framebuffer
+		uint32_t width, height;
+		int mode_valid;
+		drmModeModeInfo mode;
+
+		int gamma_size; // Number of gamma stops
+
+	} drmModeCrtc, *drmModeCrtcPtr;
+
+	*/
+
 	printf("\ncrtc [id = %u]\n", crtc->crtc_id);
 	printf("\tbuffer [id = %u]\n", crtc->buffer_id);
 	printf("\tposition: %xx%x @ %xx%x\n", crtc->width, crtc->height, crtc->x, crtc->y);
