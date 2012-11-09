@@ -222,6 +222,66 @@ void encoder_info(drmModeRes *resources, drmModeEncoder *encoder, drmModeCrtc **
 	return;
 }
 
+void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
+{
+	int i;
+
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModePlane {
+		uint32_t count_formats;
+		uint32_t *formats;
+		uint32_t plane_id;
+
+		uint32_t crtc_id;
+		uint32_t fb_id;
+
+		uint32_t crtc_x, crtc_y;
+		uint32_t x, y;
+
+		uint32_t possible_crtcs;
+		uint32_t gamma_size;
+	} drmModePlane, *drmModePlanePtr;
+	*/
+	printf("\nPlane [id = %u]\n", plane->plane_id);
+	printf("\tFB ID [id = %u]\n", plane->fb_id);
+	printf("\tcrtc ID [id = %u]\n", plane->crtc_id);
+
+	printf("\tCRTC XxY %ux%x\n", plane->crtc_x, plane->crtc_y);
+	printf("\tXxY %ux%x\n", plane->x, plane->y);
+	printf("\tSupported crtc:");
+	for (i = 0; i < 31; i++)
+		if (plane->possible_crtcs & (1 << i)) {
+			if (crtcs[i] != NULL)
+				printf(" [id = %d]", crtcs[i]->crtc_id);
+			else
+				printf(" [#%d, ??]",  i);
+		}
+	printf("\n");
+}
+
+void planes_info(int fd, drmModeCrtc **crtcs)
+{
+	drmModePlaneRes *plane_resources;
+	int i;
+
+	plane_resources = drmModeGetPlaneResources(fd);
+	if (!plane_resources) {
+		fprintf(stderr, "Error getting plane resources\n");
+		return;
+	}
+
+	for (i = 0; i < plane_resources->count_planes; i++) {
+		drmModePlane *plane = drmModeGetPlane(fd, plane_resources->planes[i]);
+		if (!plane)
+			continue;
+
+		plane_info(plane, crtcs);
+
+		drmModeFreePlane(plane);
+	}
+}
+
 int main(int argc, char *argv[])
 {
     drmModeCrtcPtr *crtcs;
@@ -295,6 +355,8 @@ int main(int argc, char *argv[])
 		encoder_info(resources, encoder, crtcs);
         drmModeFreeEncoder(encoder);
     }
+
+	planes_info(fd, crtcs);
 
 	for (i = 0; i < resources->count_crtcs; i++) {
 		if (crtcs[i] != NULL)
