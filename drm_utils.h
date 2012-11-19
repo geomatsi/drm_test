@@ -28,3 +28,4 @@ struct kms_display {
 
 bool find_drm_configuration(int fd, struct kms_display *kms);
 void dump_drm_configuration(struct kms_display *kms);
+void dump_crtc_configuration(char *msg, drmModeCrtc *crtc);

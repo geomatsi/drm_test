@@ -36,7 +36,7 @@ int main(char argc, char *argv[])
 	uint32_t *dst;
 	int ret, fd;
 
-    drmModeCrtcPtr saved_crtc;
+    drmModeCrtcPtr saved_crtc, current_crtc;
 
 	uint32_t attr[] = {
 		KMS_WIDTH, 0,
@@ -120,26 +120,45 @@ int main(char argc, char *argv[])
         goto err_buffer_unmap;
     }
 
+    dump_crtc_configuration("saved_crtc", saved_crtc);
+
 	/* setup new crtc */
 
     ret = drmModeSetCrtc(fd, kms_data.crtc->crtc_id, fb, 0, 0,
             &kms_data.connector->connector_id, 1, kms_data.mode);
+
 	if (ret) {
 		perror("failed drmModeSetCrtc(new)");
 		goto err_buffer_unmap;
     }
 
-    drmModeDirtyFB(fd, fb, NULL, 0);
+    current_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
+
+    if (current_crtc != NULL) {
+        dump_crtc_configuration("current_crtc", current_crtc);
+    } else {
+		perror("failed drmModeGetCrtc(new)");
+    }
 
 	/* draw on the screen */
 
     draw_test_image((uint32_t *) dst, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
+
+    /* FIXME: for some reason so far only vmware needed it */
+    drmModeDirtyFB(fd, fb, NULL, 0);
+
 	getchar();
 
     /* restore original crtc settings */
 
-    ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
-            saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
+    if (saved_crtc->mode_valid) {
+        ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
+                saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
+
+        if (ret) {
+            perror("failed drmModeSetCrtc(restore original)");
+        }
+    }
 
 err_fb:
     drmModeRmFB(fd, fb);

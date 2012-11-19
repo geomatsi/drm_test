@@ -133,3 +133,10 @@ void dump_drm_configuration(struct kms_display *kms)
     printf("setting mode \"%s\" on connector %d, encoder %d, crtc %d\n",
             kms->mode->name, kms->connector->connector_id, kms->encoder->encoder_id, kms->crtc->crtc_id);
 }
+
+void dump_crtc_configuration(char *msg, drmModeCrtc *crtc)
+{
+    printf("%s: id\tfb\tpos\tsize\n", msg);
+    printf("%d\t%d\t(%d,%d)\t(%dx%d) mode[%s]\n", crtc->crtc_id, crtc->buffer_id,
+            crtc->x, crtc->y, crtc->width, crtc->height, crtc->mode.name);
+}

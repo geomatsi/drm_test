@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
 	GLuint rfb, fb;
     GLfloat angle = 0.0;
 
-	drmModeCrtcPtr saved_crtc;
+	drmModeCrtcPtr saved_crtc, current_crtc;
 
 	struct gbm_device *gbm;
 	struct gbm_bo *bo;
@@ -241,6 +241,8 @@ int main(int argc, char *argv[])
 		goto rm_fb;
 	}
 
+    dump_crtc_configuration("saved_crtc", saved_crtc);
+
 	/* set new crtc: display DRM framebuffer */
 
 	ret = drmModeSetCrtc(fd, kms.crtc->crtc_id, fb_id, 0, 0, &kms.connector->connector_id, 1, kms.mode);
@@ -249,6 +251,14 @@ int main(int argc, char *argv[])
         perror("failed drmModeSetCrtc(new)");
 		goto free_saved_crtc;
 	}
+
+    current_crtc = drmModeGetCrtc(fd, kms.crtc->crtc_id);
+
+    if (current_crtc != NULL) {
+        dump_crtc_configuration("current_crtc", current_crtc);
+    } else {
+		perror("failed drmModeGetCrtc(new)");
+    }
 
 	/* attach OpenGL framebuffer to renderbuffer bound (via EGL image) to gbm buffer object */
 
@@ -264,20 +274,25 @@ int main(int argc, char *argv[])
 
     for(i = 0; i < 10; i++) {
 		render_stuff(kms.mode->hdisplay, kms.mode->vdisplay, angle);
+
+        /* FIXME: for some reason so far only vmware needed it */
+        drmModeDirtyFB(fd, fb_id, NULL, 0);
+
         angle += 1.0;
 		(void) getchar();
+        fprintf(stdout, "press enter to continue...\n");
 	}
-
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
 
 	/* restore original crtc */
 
-	ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
-			saved_crtc->x, saved_crtc->y, &kms.connector->connector_id, 1, &saved_crtc->mode);
+    if (saved_crtc->mode_valid) {
+        ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
+                saved_crtc->x, saved_crtc->y, &kms.connector->connector_id, 1, &saved_crtc->mode);
 
-	if (ret) {
-        perror("failed drmModeSetCrtc(restore original)");
-	}
+        if (ret) {
+            perror("failed drmModeSetCrtc(restore original)");
+        }
+    }
 
 	/* cleanup */
 

@@ -48,7 +48,7 @@ int main(char argc, char *argv[])
 	struct drm_mode_create_dumb creq;
 	struct drm_mode_map_dumb mreq;
 
-    drmModeCrtcPtr saved_crtc;
+    drmModeCrtcPtr saved_crtc, current_crtc;
 
 	memset(&dbo, 0, sizeof(dbo));
 
@@ -136,6 +136,8 @@ int main(char argc, char *argv[])
         goto err_unmap;
     }
 
+    dump_crtc_configuration("saved_crtc", saved_crtc);
+
 	/* setup new crtc */
 
     ret = drmModeSetCrtc(fd, kms_data.crtc->crtc_id, dbo.fb, 0, 0,
@@ -145,18 +147,33 @@ int main(char argc, char *argv[])
 		goto err_unmap;
 	}
 
-    drmModeDirtyFB(fd, dbo.fb, NULL, 0);
+    current_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
+
+    if (current_crtc != NULL) {
+        dump_crtc_configuration("current_crtc", current_crtc);
+    } else {
+		perror("failed drmModeGetCrtc(new)");
+    }
 
 	/* draw on the screen */
 
     draw_test_image((uint32_t *) dbo.map, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
-	getchar();
+
+    /* FIXME: for some reason so far only vmware needed it */
+    drmModeDirtyFB(fd, dbo.fb, NULL, 0);
+
+    getchar();
 
 	/* restore old crtc */
 
-    ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
-            saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
+    if (saved_crtc->mode_valid) {
+        ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
+                saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
 
+        if (ret) {
+            perror("failed drmModeSetCrtc(restore original)");
+        }
+    }
 
 err_unmap:
     munmap(dbo.map, dbo.size);
