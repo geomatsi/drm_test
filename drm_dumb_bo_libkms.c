@@ -53,12 +53,26 @@ int main(char argc, char *argv[])
 
     drmSetMaster(fd);
 
-	/* find current DRM configuration */
+	/* DRM configuration */
 
-	if (!drm_autoconf(fd, &kms_data)) {
-		fprintf(stderr, "failed to setup KMS\n");
-		ret = -EFAULT;
-		goto err_close;
+	if (argc <= 1) {
+
+		/* DRM autoconfiguration */
+
+		if (!drm_autoconf(fd, &kms_data)) {
+			fprintf(stderr, "failed to setup KMS\n");
+			ret = -EFAULT;
+			goto err_close;
+		}
+	} else {
+
+		/* parse command line to get DRM configuration */
+
+		if (!drm_get_conf_cmdline(fd, &kms_data, argc, argv)) {
+			fprintf(stderr, "failed to get KMS settings from command line\n");
+			ret = -EINVAL;
+			goto err_close;
+		}
 	}
 
     dump_drm_configuration(&kms_data);

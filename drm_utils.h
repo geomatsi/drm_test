@@ -17,6 +17,10 @@
 
 /* */
 
+#define PREFERRED_MODE	"preferred"
+
+/* */
+
 struct kms_display {
 	drmModeConnector *connector;
 	drmModeEncoder *encoder;
@@ -26,6 +30,7 @@ struct kms_display {
 
 /* */
 
-bool find_drm_configuration(int fd, struct kms_display *kms);
+bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[]);
+bool drm_autoconf(int fd, struct kms_display *kms);
 void dump_drm_configuration(struct kms_display *kms);
 void dump_crtc_configuration(char *msg, drmModeCrtc *crtc);
