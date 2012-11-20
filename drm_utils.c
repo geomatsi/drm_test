@@ -24,8 +24,9 @@ static void drm_cmdline_usage(char *name)
 {
 	printf("usage: %s [-h] -c <connector> -e <encoder> -m <mode>\n", name);
 	printf("\t-h: this help message\n");
-	printf("\t-c <connector>	connector id, default is 0\n");
+	printf("\t-n <connector>	connector id, default is 0\n");
 	printf("\t-e <encoder>		encoder id, default is 0\n");
+	printf("\t-c <crtc>			crtc id, default is 0\n");
 	printf("\t-m <mode>			mode name, default is 'preferred'\n");
 }
 
@@ -34,7 +35,6 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 	drmModeConnector *connector;
 	drmModeEncoder *encoder;
 	drmModeCrtc *crtc;
-	drmModeCrtc *c;
 
     drmModeRes *resources;
 	drmModeModeInfo *mode;
@@ -42,13 +42,18 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 	int opt, i;
 
 	char *mode_name = PREFERRED_MODE;
+
 	int cid = 0;
 	int eid = 0;
+	int nid = 0;
 
-	while ((opt = getopt(argc, argv, "c:e:m:h")) != -1) {
+	while ((opt = getopt(argc, argv, "n:c:e:m:h")) != -1) {
 		switch (opt) {
 			case 'm':
 				mode_name = strdup(optarg);
+				break;
+			case 'n':
+				nid = atoi(optarg);
 				break;
 			case 'c':
 				cid = atoi(optarg);
@@ -69,25 +74,25 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 		return false;
 	}
 
-    /* find connected connector */
+    /* find connector */
 
 	for (i = 0; i < resources->count_connectors; i++) {
 		connector = drmModeGetConnector(fd, resources->connectors[i]);
 		if (!connector)
 			continue;
 
-		if (cid == connector->connector_id)
+		if (nid == connector->connector_id)
 			break;
 
 		drmModeFreeConnector(connector);
 	}
 
 	if (i == resources->count_connectors) {
-		fprintf(stderr, "Connector with id = %d does not exist\n", cid);
-		return false;
+		fprintf(stderr, "Connector with id = %d does not exist\n", nid);
+		goto no_connector;
 	}
 
-    /* find appropriate encoder */
+    /* find encoder */
 
 	for (i = 0; i < resources->count_encoders; i++) {
 		encoder = drmModeGetEncoder(fd, resources->encoders[i]);
@@ -102,10 +107,10 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 
 	if (i == resources->count_encoders) {
 		fprintf(stderr, "Encoder with id = %d does not exist\n", eid);
-		return false;
+		goto no_encoder;
     }
 
-    /* select preferred mode */
+    /* find mode */
 
     for (i = 0, mode = connector->modes; i < connector->count_modes; i++, mode++) {
         if (0 == strcmp(mode->name, mode_name))
@@ -114,12 +119,10 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 
 	if (i == connector->count_modes) {
 		fprintf(stderr, "Mode with name %s does not exist\n", mode_name);
-		return false;
+		return no_mode;
     }
 
     /* find crtc */
-
-    c = NULL;
 
     for (i = 0; i < resources->count_crtcs; i++) {
         crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
@@ -127,16 +130,15 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
         if (!crtc)
             continue;
 
-        if (crtc->crtc_id == encoder->crtc_id)
+        if (cid == crtc->crtc_id)
             break;
 
-        if (!c && (encoder->possible_crtcs & (1 << i)))
-            c = crtc;
+        drmModeFreeCrtc(crtc);
     }
 
 	if (i == resources->count_crtcs) {
-        fprintf(stderr, "No crtc for encoder, choose the first possible crtc\n");
-        crtc = c;
+		fprintf(stderr, "Crtc with id = %d does not exist\n", cid);
+		no_crtc;
     }
 
     /* */
@@ -148,10 +150,13 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 
 	return true;
 
-drm_free_connector:
+no_crtc:
+no_mode:
+	drmModeFreeEncoder(encoder);
+no_encoder:
 	drmModeFreeConnector(connector);
+no_connector:
 	drm_cmdline_usage(argv[0]);
-
 	return false;
 }
 
