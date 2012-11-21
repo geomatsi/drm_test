@@ -119,7 +119,7 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 
 	if (i == connector->count_modes) {
 		fprintf(stderr, "Mode with name %s does not exist\n", mode_name);
-		return no_mode;
+		goto no_mode;
     }
 
     /* find crtc */
@@ -138,7 +138,7 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 
 	if (i == resources->count_crtcs) {
 		fprintf(stderr, "Crtc with id = %d does not exist\n", cid);
-		no_crtc;
+		goto no_crtc;
     }
 
     /* */
