@@ -16,7 +16,7 @@
 #include <xf86drm.h>
 #include <libkms.h>
 
-#include "draw_utils.h"
+#include "bitmap_utils.h"
 #include "drm_utils.h"
 
 /* */

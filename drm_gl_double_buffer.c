@@ -28,10 +28,6 @@
 #include <fcntl.h>
 
 #define EGL_EGLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-
-#include <GL/gl.h>
-#include <GL/glext.h>
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -40,115 +36,12 @@
 #include <drm.h>
 #include <xf86drmMode.h>
 
+#include "drm_utils.h"
+#include "gl_utils.h"
+
 #ifdef GL_OES_EGL_image
 static PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC glEGLImageTargetRenderbufferStorageOES_func;
 #endif
-
-struct kms {
-    drmModeConnector *connector;
-    drmModeEncoder *encoder;
-    drmModeModeInfo mode;
-    uint32_t fb_id[2];
-};
-
-    static EGLBoolean
-setup_kms(int fd, struct kms *kms)
-{
-    drmModeRes *resources;
-
-    drmModeConnector *connector;
-    drmModeEncoder *encoder;
-    int i;
-
-    resources = drmModeGetResources(fd);
-    if (!resources) {
-        fprintf(stderr, "drmModeGetResources failed\n");
-        return EGL_FALSE;
-    }
-
-    for (i = 0; i < resources->count_connectors; i++) {
-        connector = drmModeGetConnector(fd, resources->connectors[i]);
-        if (connector == NULL)
-            continue;
-
-        if (connector->connection == DRM_MODE_CONNECTED &&
-                connector->count_modes > 0)
-            break;
-
-        drmModeFreeConnector(connector);
-    }
-
-    if (i == resources->count_connectors) {
-        fprintf(stderr, "No currently active connector found.\n");
-        return EGL_FALSE;
-    }
-
-    for (i = 0; i < resources->count_encoders; i++) {
-        encoder = drmModeGetEncoder(fd, resources->encoders[i]);
-
-        if (encoder == NULL)
-            continue;
-
-        if (encoder->encoder_id == connector->encoder_id)
-            break;
-
-        drmModeFreeEncoder(encoder);
-    }
-
-    kms->connector = connector;
-    kms->encoder = encoder;
-    kms->mode = connector->modes[0];
-
-    return EGL_TRUE;
-}
-
-    static void
-render_stuff(int width, int height, GLfloat rotz)
-{
-    GLfloat view_rotx = 0.0, view_roty = 0.0, view_rotz = rotz;
-    static const GLfloat verts[3][2] = {
-        { -1, -1 },
-        {  1, -1 },
-        {  0,  1 }
-    };
-    static const GLfloat colors[3][3] = {
-        { 1, 0, 0 },
-        { 0, 1, 0 },
-        { 0, 0, 1 }
-    };
-    GLfloat ar = (GLfloat) width / (GLfloat) height;
-
-    glViewport(0, 0, (GLint) width, (GLint) height);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glFrustum(-ar, ar, -1, 1, 5.0, 60.0);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glTranslatef(0.0, 0.0, -10.0);
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glPushMatrix();
-    glRotatef(view_rotx, 1, 0, 0);
-    glRotatef(view_roty, 0, 1, 0);
-    glRotatef(view_rotz, 0, 0, 1);
-
-    glVertexPointer(2, GL_FLOAT, 0, verts);
-    glColorPointer(3, GL_FLOAT, 0, colors);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_COLOR_ARRAY);
-
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    glDisableClientState(GL_VERTEX_ARRAY);
-    glDisableClientState(GL_COLOR_ARRAY);
-
-    glPopMatrix();
-
-    glFinish();
-}
 
 static const char device_name[] = "/dev/dri/card0";
 
@@ -159,24 +52,40 @@ int main(int argc, char *argv[])
     EGLImageKHR image[2];
     EGLint major, minor;
     const char *ver, *extensions;
-    GLuint fb[2], color_rb, depth_rb;
-    uint32_t handle, stride;
-    struct kms kms;
-    int ret, fd, i;
+
+    drmModeCrtcPtr saved_crtc;
+    struct kms_display kms;
+
     struct gbm_device *gbm;
     struct gbm_bo *bo[2];
-    drmModeCrtcPtr saved_crtc;
-    GLuint fbo;
 
+    uint32_t fb[2], color_rb, depth_rb;
+    uint32_t handle, stride;
+    uint32_t fb_id[2];
+    uint32_t fbo;
+
+    float angle = 0.0;
     uint32_t current;
-    GLfloat angle = 0.0;
+    int ret, fd, i;
 
-    fd = open(device_name, O_RDWR);
-    if (fd < 0) {
-        /* Probably permissions error */
-        fprintf(stderr, "couldn't open %s, skipping\n", device_name);
-        return -1;
-    }
+	fd = open(device_name, O_RDWR);
+	if (fd < 0) {
+		/* Probably permissions error */
+		fprintf(stderr, "couldn't open %s, skipping\n", device_name);
+		return -1;
+	}
+
+	/* Find the first available KMS configuration */
+
+	if (!drm_autoconf(fd, &kms)) {
+		fprintf(stderr, "failed to setup KMS\n");
+		ret = -EFAULT;
+		goto close_fd;
+	}
+
+    dump_drm_configuration(&kms);
+
+	/* Init EGL and create EGL context */
 
     gbm = gbm_create_device(fd);
     if (gbm == NULL) {
@@ -210,12 +119,8 @@ int main(int argc, char *argv[])
         goto egl_terminate;
     }
 
-    if (!setup_kms(fd, &kms)) {
-        ret = -1;
-        goto egl_terminate;
-    }
-
     eglBindAPI(EGL_OPENGL_API);
+
     ctx = eglCreateContext(dpy, NULL, EGL_NO_CONTEXT, NULL);
     if (ctx == NULL) {
         fprintf(stderr, "failed to create context\n");
@@ -237,6 +142,10 @@ int main(int argc, char *argv[])
     fprintf(stderr, "GL_OES_EGL_image not supported at compile time\n");
 #endif
 
+	/*	Bind together DRM (gbm), EGL (image) and OpenGL (rfb, fb) enitities
+	 *		gbm buffer object <-> EGL image <-> GL renderbuffer
+	 */
+
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
@@ -246,7 +155,7 @@ int main(int argc, char *argv[])
 
         glBindRenderbuffer(GL_RENDERBUFFER, fb[i]);
 
-        bo[i] = gbm_bo_create(gbm, kms.mode.hdisplay, kms.mode.vdisplay,
+        bo[i] = gbm_bo_create(gbm, kms.mode->hdisplay, kms.mode->vdisplay,
                     GBM_BO_FORMAT_XRGB8888,
                     GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 
@@ -269,9 +178,8 @@ int main(int argc, char *argv[])
         handle = gbm_bo_get_handle(bo[i]).u32;
         stride = gbm_bo_get_pitch(bo[i]);
 
-        ret = drmModeAddFB(fd,
-                kms.mode.hdisplay, kms.mode.vdisplay,
-                24, 32, stride, handle, &kms.fb_id[i]);
+        ret = drmModeAddFB(fd, kms.mode->hdisplay, kms.mode->vdisplay,
+			24, 32, stride, handle, &fb_id[i]);
 
         if (ret) {
             fprintf(stderr, "failed to create fb\n");
@@ -289,14 +197,18 @@ int main(int argc, char *argv[])
 							  fb[current]);
     */
 
-    saved_crtc = drmModeGetCrtc(fd, kms.encoder->crtc_id);
+    saved_crtc = drmModeGetCrtc(fd, kms.crtc->crtc_id);
     if (saved_crtc == NULL) {
         fprintf(stderr, "failed to get current mode\n");
         goto rm_fb;
     }
 
-    ret = drmModeSetCrtc(fd, kms.encoder->crtc_id, kms.fb_id[current], 0, 0,
-            &kms.connector->connector_id, 1, &kms.mode);
+    dump_crtc_configuration("saved_crtc", saved_crtc);
+
+	/* set new crtc: display DRM framebuffer */
+
+    ret = drmModeSetCrtc(fd, kms.crtc->crtc_id, fb_id[current], 0, 0,
+            &kms.connector->connector_id, 1, kms.mode);
 
     if (ret) {
         fprintf(stderr, "failed to set mode: %m\n");
@@ -314,9 +226,9 @@ int main(int argc, char *argv[])
     		fprintf(stderr, "glCheckFramebufferStatus() failed\n");
 	    }
 
-        render_stuff(kms.mode.hdisplay, kms.mode.vdisplay, angle);
+        render_stuff(kms.mode->hdisplay, kms.mode->vdisplay, angle);
 
-        if (drmModePageFlip(fd, kms.encoder->crtc_id, kms.fb_id[current], 0, NULL) < 0) {
+        if (drmModePageFlip(fd, kms.crtc->crtc_id, fb_id[current], 0, NULL) < 0) {
             fprintf(stderr, "queueing pageflip failed\n");
     	} else {
             fprintf(stderr, "queueing ok\n");
@@ -352,8 +264,8 @@ rm_rb:
     glDeleteRenderbuffers(1, &fb[0]);
     glDeleteRenderbuffers(1, &fb[1]);
 rm_fb:
-    drmModeRmFB(fd, kms.fb_id[0]);
-    drmModeRmFB(fd, kms.fb_id[1]);
+    drmModeRmFB(fd, fb_id[0]);
+    drmModeRmFB(fd, fb_id[1]);
     eglDestroyImageKHR(dpy, image[0]);
     eglDestroyImageKHR(dpy, image[1]);
 destroy_gbm_bo:

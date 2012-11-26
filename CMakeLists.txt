@@ -12,16 +12,16 @@ option (WITH_GL         "Build OpenGL/OpenGLES examples"    ON)
 add_executable(drm_info drm_info.c)
 
 if (WITH_DUMB_BO)
-    add_executable(drm_dumb_bo drm_dumb_bo.c drm_utils.c draw_utils.c)
+    add_executable(drm_dumb_bo drm_dumb_bo.c drm_utils.c bitmap_utils.c)
 endif (WITH_DUMB_BO)
 
 if (WITH_LIBKMS)
-    add_executable(drm_dumb_bo_libkms drm_dumb_bo_libkms.c drm_utils.c draw_utils.c)
+    add_executable(drm_dumb_bo_libkms drm_dumb_bo_libkms.c drm_utils.c bitmap_utils.c)
 endif (WITH_LIBKMS)
 
 if (WITH_GL)
-    add_executable(test test.c)
-    add_executable(drm_gl_simple drm_gl_simple.c drm_utils.c)
+    add_executable(drm_gl_double_buffer drm_gl_double_buffer.c drm_utils.c gl_utils.c)
+    add_executable(drm_gl_single_buffer drm_gl_single_buffer.c drm_utils.c gl_utils.c)
 endif (WITH_GL)
 
 # find headers
@@ -113,6 +113,6 @@ if (WITH_LIBKMS)
 endif (WITH_LIBKMS)
 
 if (WITH_GL)
-    target_link_libraries(test ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
-    target_link_libraries(drm_gl_simple ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+    target_link_libraries(drm_gl_double_buffer ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+    target_link_libraries(drm_gl_single_buffer ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
 endif (WITH_GL)

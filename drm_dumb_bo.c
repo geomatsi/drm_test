@@ -17,7 +17,7 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#include "draw_utils.h"
+#include "bitmap_utils.h"
 #include "drm_utils.h"
 
 /* */
