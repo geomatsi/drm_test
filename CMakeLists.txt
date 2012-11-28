@@ -13,6 +13,7 @@ add_executable(drm_info drm_info.c)
 
 if (WITH_DUMB_BO)
     add_executable(drm_dumb_bo drm_dumb_bo.c drm_utils.c bitmap_utils.c)
+    add_executable(drm_dumb_bo_plane drm_dumb_bo_plane.c drm_utils.c )
 endif (WITH_DUMB_BO)
 
 if (WITH_LIBKMS)
@@ -106,6 +107,7 @@ target_link_libraries(drm_info ${DRM_LIBRARY})
 
 if (WITH_DUMB_BO)
     target_link_libraries(drm_dumb_bo ${DRM_LIBRARY})
+    target_link_libraries(drm_dumb_bo_plane ${DRM_LIBRARY})
 endif (WITH_DUMB_BO)
 
 if (WITH_LIBKMS)
