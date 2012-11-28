@@ -196,10 +196,18 @@ int main(int argc, char *argv[])
 	resources = drmModeGetPlaneResources(fd);
 	if (!resources || resources->count_planes == 0) {
 		fprintf(stderr, "drmModeGetPlaneResources failed\n");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err_close;
 	}
 
 	plane = drmModeGetPlane(fd, resources->planes[0]);
+
+	if (!plane) {
+		fprintf(stderr, "drmModeGetPlane failed\n");
+		ret = -ENODEV;
+		goto err_close;
+	}
+
 	dbo.plane_id = plane->plane_id;
 
 	/* create dumb buffer object */
@@ -253,9 +261,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "cannot set plane\n");
 		return ret;
 	}
-
-	return 0;
-
 
 	/* draw on the screen */
 	do_draw_1(&dbo);
