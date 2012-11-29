@@ -19,6 +19,8 @@ endif (WITH_DUMB_BO)
 
 if (WITH_LIBKMS)
     add_executable(drm_dumb_bo_libkms drm_dumb_bo_libkms.c drm_utils.c bitmap_utils.c)
+    add_executable(drm_server drm_server.c drm_utils.c bitmap_utils.c)
+    add_executable(drm_client drm_client.c drm_utils.c bitmap_utils.c)
 endif (WITH_LIBKMS)
 
 if (WITH_GL)
@@ -114,6 +116,8 @@ endif (WITH_DUMB_BO)
 
 if (WITH_LIBKMS)
     target_link_libraries(drm_dumb_bo_libkms ${KMS_LIBRARY} ${DRM_LIBRARY})
+    target_link_libraries(drm_client ${KMS_LIBRARY} ${DRM_LIBRARY})
+    target_link_libraries(drm_server ${KMS_LIBRARY} ${DRM_LIBRARY})
 endif (WITH_LIBKMS)
 
 if (WITH_GL)

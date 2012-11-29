@@ -18,6 +18,7 @@
 /* */
 
 #define PREFERRED_MODE	"preferred"
+#define DRM_SERVER_NAME	"/tmp/drm_srv"
 
 /* */
 

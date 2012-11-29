@@ -148,6 +148,7 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
     kms->crtc = crtc;
 	kms->mode = mode;
 
+	drmModeFreeResources(resources);
 	return true;
 
 no_crtc:
@@ -262,6 +263,7 @@ bool drm_autoconf(int fd, struct kms_display *kms)
     kms->crtc = crtc;
 	kms->mode = mode;
 
+	drmModeFreeResources(resources);
 	return true;
 
 drm_free_connector:
