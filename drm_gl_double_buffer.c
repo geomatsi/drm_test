@@ -226,6 +226,9 @@ int main(int argc, char *argv[])
     		fprintf(stderr, "glCheckFramebufferStatus() failed\n");
 	    }
 
+        /* FIXME: for some reason so far only vmware needed it */
+        drmModeDirtyFB(fd, fb_id[current], NULL, 0);
+
         render_stuff(kms.mode->hdisplay, kms.mode->vdisplay, angle);
 
         if (drmModePageFlip(fd, kms.crtc->crtc_id, fb_id[current], 0, NULL) < 0) {
