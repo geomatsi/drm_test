@@ -18,7 +18,14 @@
 /* */
 
 #define PREFERRED_MODE	"preferred"
+
+/* */
+
 #define DRM_SERVER_NAME	"/tmp/drm_srv"
+
+#define DRM_SRV_MSGLEN  20
+#define DRM_AUTH_OK     "AUTH OK"
+#define DRM_AUTH_FAIL   "AUTH FAIL"
 
 /* */
 

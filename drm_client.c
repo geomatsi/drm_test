@@ -55,7 +55,7 @@ int main(char argc, char *argv[])
 		exit(-1);
 	}
 
-    //drmDropMaster(fd);
+    drmDropMaster(fd);
 
 	/* Get magic number */
 
@@ -70,7 +70,11 @@ int main(char argc, char *argv[])
 	do {
 		struct sockaddr_un  serv_addr;
 		int sockfd, servlen,n;
-		char buffer[80];
+        struct timeval tv;
+        fd_set rset;
+
+		char buffer[DRM_SRV_MSGLEN];
+
 
 		bzero((char *)&serv_addr, sizeof(serv_addr));
 		serv_addr.sun_family = AF_UNIX;
@@ -88,19 +92,73 @@ int main(char argc, char *argv[])
 			goto err_close;
 		}
 
-		bzero(buffer, 82);
-		snprintf(buffer, 80, "%d", magic);
-		fprintf(stdout, "send magic = %d to server\n", magic);
+		bzero(buffer, sizeof(buffer));
+		snprintf(buffer, sizeof(buffer), "%d", magic);
+		fprintf(stdout, "send magic [%d] to server\n", magic);
 
-		ret = write(sockfd, buffer, strlen(buffer));
+		ret = write(sockfd, buffer, sizeof(buffer));
 		if (ret < 0) {
 			perror("could not send magic to server");
+            close(sockfd);
 			goto err_close;
 		}
 
-		fprintf(stdout, "wait for 1 sec...\n");
-		sleep(1);
+        /* wait for server response */
+
+        while (1) {
+
+            FD_ZERO(&rset);
+            FD_SET(sockfd, &rset);
+
+            tv.tv_sec = 5;
+            tv.tv_usec = 0;
+
+            ret = select(sockfd + 1, &rset, NULL, NULL, &tv);
+
+            if (ret == 0) {
+                /* timeout */
+                fprintf(stdout, "timeout expired: no response from server\n");
+                goto err_close;
+            }
+
+            if (ret == -1) {
+                if (errno == EINTR) {
+                    perror("'select' was interrupted, try again");
+                    continue;
+                } else {
+                    perror("'select' problem");
+                    goto err_close;
+                }
+            }
+
+            if (FD_ISSET(sockfd, &rset)) {
+
+                bzero(buffer, sizeof(buffer));
+                ret = read(sockfd, buffer, sizeof(buffer));
+                if (ret <= 0) {
+                    perror("could not receive answer from server");
+                    close(sockfd);
+                    goto err_close;
+                }
+
+                fprintf(stdout, "got server response: [%s]\n", buffer);
+
+                if (0 == strncmp(buffer, DRM_AUTH_OK, strlen(DRM_AUTH_OK))) {
+                    fprintf(stdout, "ok, authentication successful\n");
+                    break;
+                } else {
+                    fprintf(stdout, "authentication failed\n");
+                    close(sockfd);
+                    goto err_close;
+                }
+
+            } else {
+                fprintf(stdout, "hmm... should not happen... lets try one more cycle\n");
+            }
+        }
+
 		close(sockfd);
+
 	} while(0);
 
 	/* DRM configuration */
