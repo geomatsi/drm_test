@@ -368,6 +368,7 @@ int main(char argc, char *argv[])
 
 	drmModeRmFB(fd, dbo_plane.fb);
 
+	getchar();
 
 	/* restore old crtc */
 
