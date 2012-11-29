@@ -128,7 +128,7 @@ static void do_draw_3(struct dumb_rb *dbo)
 int main(char argc, char *argv[])
 {
 	struct kms_display kms_data;
-	struct dumb_rb dbo;
+	struct dumb_rb dbo, dbo_plane;
 	uint64_t has_dumb;
 	int ret, fd;
 
@@ -261,9 +261,18 @@ int main(char argc, char *argv[])
 		perror("failed drmModeGetCrtc(new)");
     }
 
+	/* draw on the screen */
+
+    draw_test_image((uint32_t *) dbo.map, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
+
+    /* FIXME: for some reason so far only vmware needed it */
+    drmModeDirtyFB(fd, dbo.fb, NULL, 0);
+
+	getchar();
+
 	/* setup plane */
 
-	memset(&dbo, 0, sizeof(dbo));
+	memset(&dbo_plane, 0, sizeof(dbo_plane));
 	memset(&mreq, 0, sizeof(mreq));
 	memset(&creq, 0, sizeof(creq));
 	memset(&dreq, 0, sizeof(dreq));
@@ -285,15 +294,15 @@ int main(char argc, char *argv[])
 		goto err_close;
 	}
 
-	dbo.plane_id = plane->plane_id;
+	dbo_plane.plane_id = plane->plane_id;
 
 	/* create dumb buffer object */
 
-	dbo.w = 800;
-	dbo.h = 480;
+	dbo_plane.w = 800;
+	dbo_plane.h = 480;
 
-	creq.width = dbo.w;
-	creq.height = dbo.h;
+	creq.width = dbo_plane.w;
+	creq.height = dbo_plane.h;
 	creq.bpp = 32;
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq);
@@ -302,13 +311,13 @@ int main(char argc, char *argv[])
 		return ret;
 	}
 
-	dbo.handle = creq.handle;
-	dbo.stride = creq.pitch;
-	dbo.size = creq.size;
+	dbo_plane.handle = creq.handle;
+	dbo_plane.stride = creq.pitch;
+	dbo_plane.size = creq.size;
 
 	/* create framebuffer for dumb buffer object */
 
-	ret = drmModeAddFB(fd, dbo.w, dbo.h, 24, 32, dbo.stride, dbo.handle, &dbo.fb);
+	ret = drmModeAddFB(fd, dbo_plane.w, dbo_plane.h, 24, 32, dbo_plane.stride, dbo_plane.handle, &dbo_plane.fb);
 	if (ret) {
 		fprintf(stderr, "cannot add drm framebuffer for dumb buffer object\n");
 		return ret;
@@ -316,7 +325,7 @@ int main(char argc, char *argv[])
 
 	/* map dumb buffer object */
 
-	mreq.handle = dbo.handle;
+	mreq.handle = dbo_plane.handle;
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
 	if (ret) {
@@ -324,8 +333,8 @@ int main(char argc, char *argv[])
 		return ret;
 	}
 
-	dbo.map = mmap(0, dbo.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mreq.offset);
-	if (dbo.map == MAP_FAILED) {
+	dbo_plane.map = mmap(0, dbo_plane.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mreq.offset);
+	if (dbo_plane.map == MAP_FAILED) {
 		fprintf(stderr, "cannot mmap dumb buffer\n");
 		return -EFAULT;
 	}
@@ -333,30 +342,32 @@ int main(char argc, char *argv[])
 	/* setup new plane */
 
 	ret = drmModeSetPlane(fd, plane->plane_id, kms_data.crtc->crtc_id,
-		dbo.fb, 0, 32, 32, dbo.w, dbo.h, 0, 0, dbo.w << 16, dbo.h << 16);
+		dbo_plane.fb, 0, 32, 32, dbo_plane.w, dbo_plane.h, 0, 0, dbo_plane.w << 16, dbo_plane.h << 16);
 	if (ret) {
 		fprintf(stderr, "cannot set plane\n");
 		return ret;
 	}
 
-	/* draw on the screen */
-
-    draw_test_image((uint32_t *) dbo.map, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
-
-    /* FIXME: for some reason so far only vmware needed it */
-    //drmModeDirtyFB(fd, dbo.fb, NULL, 0);
-
-    getchar();
-
 	/* draw on the plane */
-	do_draw_1(&dbo);
+
+	do_draw_1(&dbo_plane);
 	getchar();
 
-	do_draw_2(&dbo);
+	do_draw_2(&dbo_plane);
 	getchar();
 
-	do_draw_3(&dbo);
+	do_draw_3(&dbo_plane);
 	getchar();
+
+	/* cleanup plane */
+
+	drmModeSetPlane(fd, dbo_plane.plane_id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+	if (dbo_plane.map)
+		munmap(dbo_plane.map, dbo_plane.size);
+
+	drmModeRmFB(fd, dbo_plane.fb);
+
 
 	/* restore old crtc */
 
