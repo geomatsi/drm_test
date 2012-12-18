@@ -22,14 +22,6 @@
 
 /* */
 
-#define DRM_SERVER_NAME	"/tmp/drm_srv"
-
-#define DRM_SRV_MSGLEN  20
-#define DRM_AUTH_OK     "AUTH OK"
-#define DRM_AUTH_FAIL   "AUTH FAIL"
-
-/* */
-
 struct kms_display {
 	drmModeConnector *connector;
 	drmModeEncoder *encoder;
@@ -43,3 +35,4 @@ bool drm_get_conf_cmdline(int fd, struct kms_display *kms, int argc, char *argv[
 bool drm_autoconf(int fd, struct kms_display *kms);
 void dump_drm_configuration(struct kms_display *kms);
 void dump_crtc_configuration(char *msg, drmModeCrtc *crtc);
+drmModeModeInfo * drm_get_mode_by_name(int fd, uint32_t connector_id, char *mode_name);

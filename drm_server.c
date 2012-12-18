@@ -21,6 +21,7 @@
 #include <libkms.h>
 
 #include "drm_utils.h"
+#include "drm_proto.h"
 
 /* */
 
@@ -41,8 +42,11 @@ int main(char argc, char *argv[])
 
     char buf[DRM_SRV_MSGLEN + 1];
     struct sigaction act;
-    drm_magic_t magic;
+	uint32_t command, magic;
+	uint32_t *pmsg;
     int ret, fd;
+
+	struct drm_client_info *pclient;
 
     /* setup signal handler */
 
@@ -93,16 +97,117 @@ int main(char argc, char *argv[])
 
         bzero(buf, sizeof(buf));
         msglen = read(clientfd, buf, sizeof(buf));
-        magic = atoi(buf);
-        fprintf(stdout, "accepted request for magic = %d\n", magic);
+		sscanf(buf, "%d:%d", &magic, &command);
 
-        ret = drmAuthMagic(fd, magic);
-        if (ret) {
-            perror("failed drmAuthMagic");
-        }
+        fprintf(stdout, "accepted request [%s]\n", buf);
+		fprintf(stdout, "magic = %d, command = %d\n", magic, command);
 
-        bzero(buf, sizeof(buf));
-        snprintf(buf, sizeof(buf), ret ? DRM_AUTH_FAIL : DRM_AUTH_OK);
+		/* handle request */
+
+		switch (command) {
+			case CMD_AUTH:	/* authenticate client */
+				do {
+
+					ret = drmAuthMagic(fd, magic);
+
+					if (ret) {
+						perror("failed drmAuthMagic");
+					} else {
+						pclient = calloc(sizeof(*pclient), 1);
+						pclient->magic = magic;
+					}
+
+					bzero(buf, sizeof(buf));
+					snprintf(buf, sizeof(buf), "%d:%d", magic, ret ? DRM_ERROR: DRM_OK);
+				} while (0);
+
+				break;
+
+			case CMD_CRTC:	/* save old crtc and create new crtc */
+				do {
+
+					pclient->crtc_id = pmsg[2];
+					pclient->conn_id = pmsg[3];
+					pclient->fb = pmsg[4];
+					pclient->mode_name = strdup((char *) pmsg[5]);
+					pclient->mode = drm_get_mode_by_name(fd, pclient->conn_id, pclient->mode_name);
+
+					if (!pclient->mode) {
+						perror("failed drm_get_mode_by_name");
+						bzero(buf, sizeof(buf));
+						snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_ERROR);
+						break;
+					}
+
+					/* store current crtc */
+
+					pclient->saved_crtc = drmModeGetCrtc(fd, pclient->crtc_id);
+					if (pclient->saved_crtc == NULL) {
+						perror("failed drmModeGetCrtc(current)");
+						bzero(buf, sizeof(buf));
+						snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_ERROR);
+						break;
+					}
+
+					dump_crtc_configuration("saved_crtc", pclient->saved_crtc);
+
+					/* setup new crtc */
+
+					ret = drmModeSetCrtc(fd, pclient->crtc_id, pclient->fb, 0, 0,
+							&pclient->conn_id, 1, pclient->mode);
+
+					if (ret) {
+						perror("failed drmModeSetCrtc(new)");
+						bzero(buf, sizeof(buf));
+						snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_ERROR);
+						break;
+					}
+
+					pclient->current_crtc = drmModeGetCrtc(fd, pclient->crtc_id);
+
+					if (pclient->current_crtc != NULL) {
+						dump_crtc_configuration("current_crtc", pclient->current_crtc);
+					} else {
+						perror("failed drmModeGetCrtc(new)");
+						bzero(buf, sizeof(buf));
+						snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_ERROR);
+						break;
+					}
+
+					bzero(buf, sizeof(buf));
+					snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_OK);
+				} while (0);
+
+				break;
+
+			case CMD_QUIT:	/* client disconnects */
+				do {
+
+					if (pclient->saved_crtc->mode_valid) {
+						ret = drmModeSetCrtc(fd, pclient->saved_crtc->crtc_id,
+							pclient->saved_crtc->buffer_id, pclient->saved_crtc->x,
+							pclient->saved_crtc->y, &pclient->conn_id,
+							1, &(pclient->saved_crtc)->mode);
+
+						if (ret) {
+							perror("failed drmModeSetCrtc(restore original)");
+							bzero(buf, sizeof(buf));
+							snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_ERROR);
+							break;
+						}
+					}
+
+					bzero(buf, sizeof(buf));
+					snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_OK);
+				} while (0);
+
+				break;
+
+			default:
+				bzero(buf, sizeof(buf));
+				snprintf(buf, sizeof(buf), "%d:%d", magic, DRM_ERROR);
+		}
+
         fprintf(stdout, "send response [%s]\n", buf);
         write(clientfd, buf, sizeof(buf));
         close(clientfd);

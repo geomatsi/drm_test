@@ -18,7 +18,7 @@
 
 #include "bitmap_utils.h"
 #include "drm_utils.h"
-#include "net_utils.h"
+#include "drm_proto.h"
 
 /* */
 
@@ -33,6 +33,7 @@ int main(char argc, char *argv[])
 
 	struct kms_display kms_data;
 
+    char buf[DRM_SRV_MSGLEN + 1];
 	uint32_t fb, stride, handle;
 	uint32_t *dst;
 	int ret, fd;
@@ -65,35 +66,24 @@ int main(char argc, char *argv[])
 
 	/* Connect to drm server and pass magic number */
 
-	ret = drm_server_auth(magic);
-	if (ret < 0) {
+	bzero(buf, sizeof(buf));
+	snprintf(buf, sizeof(buf), "%d:%d", magic, CMD_AUTH);
+	ret = drm_to_server(buf);
+	if (ret != DRM_OK) {
 		fprintf(stderr, "server auth failed\n");
 		goto err_close;
 	}
 
 	/* DRM configuration */
 
-	if (argc <= 1) {
-
-		/* DRM autoconfiguration */
-
-		if (!drm_autoconf(fd, &kms_data)) {
-			fprintf(stderr, "failed to setup KMS\n");
-			ret = -EFAULT;
-			goto err_close;
-		}
-	} else {
-
-		/* parse command line to get DRM configuration */
-
-		if (!drm_get_conf_cmdline(fd, &kms_data, argc, argv)) {
-			fprintf(stderr, "failed to get KMS settings from command line\n");
-			ret = -EINVAL;
-			goto err_close;
-		}
+	/* parse command line to get DRM configuration */
+	if (!drm_get_conf_cmdline(fd, &kms_data, argc, argv)) {
+		fprintf(stderr, "failed to get KMS settings from command line\n");
+		ret = -EINVAL;
+		goto err_close;
 	}
 
-    dump_drm_configuration(&kms_data);
+	dump_drm_configuration(&kms_data);
 
 	/* set display dimensions for chosen configuration */
 
@@ -144,6 +134,7 @@ int main(char argc, char *argv[])
 		goto err_buffer_unmap;
 	}
 
+#if 0
 	/* store current crtc */
 
     saved_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
@@ -171,6 +162,16 @@ int main(char argc, char *argv[])
     } else {
 		perror("failed drmModeGetCrtc(new)");
     }
+#else
+	bzero(buf, sizeof(buf));
+	snprintf(buf, sizeof(buf), "%d:%d:%d:%d:%d:%s", magic, CMD_CRTC,
+	kms_data.crtc->crtc_id, kms_data.connector->connector_id, fb, kms_data.mode->name);
+	ret = drm_to_server(buf);
+	if (ret != DRM_OK) {
+		fprintf(stderr, "server auth failed\n");
+		goto err_fb;
+	}
+#endif
 
 	/* draw on the screen */
 
@@ -183,6 +184,7 @@ int main(char argc, char *argv[])
 
     /* restore original crtc settings */
 
+#if 0
     if (saved_crtc->mode_valid) {
         ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
                 saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
@@ -191,6 +193,15 @@ int main(char argc, char *argv[])
             perror("failed drmModeSetCrtc(restore original)");
         }
     }
+#else
+	bzero(buf, sizeof(buf));
+	snprintf(buf, sizeof(buf), "%d:%d", magic, CMD_QUIT);
+	ret = drm_to_server(buf);
+	if (ret != DRM_OK) {
+		fprintf(stderr, "server auth failed\n");
+		goto err_fb;
+	}
+#endif
 
 err_fb:
     drmModeRmFB(fd, fb);

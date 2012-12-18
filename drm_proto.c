@@ -1,18 +1,17 @@
-#include "net_utils.h"
+#include "drm_proto.h"
 #include "drm_utils.h"
 
 /* */
 
-int drm_server_auth(drm_magic_t magic)
+int drm_to_server(char *tx_buf)
 {
 		struct sockaddr_un  serv_addr;
-		int sockfd, servlen,n;
+		int sockfd, servlen;
         struct timeval tv;
+		int ret, val, mag;
         fd_set rset;
-		int ret;
 
-		char buffer[DRM_SRV_MSGLEN];
-
+		char rx_buf[DRM_SRV_MSGLEN + 1];
 
 		bzero((char *)&serv_addr, sizeof(serv_addr));
 		serv_addr.sun_family = AF_UNIX;
@@ -32,11 +31,9 @@ int drm_server_auth(drm_magic_t magic)
 			goto err_close;
 		}
 
-		bzero(buffer, sizeof(buffer));
-		snprintf(buffer, sizeof(buffer), "%d", magic);
-		fprintf(stdout, "send magic [%d] to server\n", magic);
+		fprintf(stdout, "send message [%s] to server\n", tx_buf);
 
-		ret = write(sockfd, buffer, sizeof(buffer));
+		ret = write(sockfd, tx_buf, sizeof(tx_buf));
 		if (ret < 0) {
 			perror("could not send magic to server");
 			goto err_close;
@@ -55,7 +52,6 @@ int drm_server_auth(drm_magic_t magic)
             ret = select(sockfd + 1, &rset, NULL, NULL, &tv);
 
             if (ret == 0) {
-                /* timeout */
                 fprintf(stdout, "timeout expired: no response from server\n");
 				ret = -1;
                 goto err_close;
@@ -63,8 +59,8 @@ int drm_server_auth(drm_magic_t magic)
 
             if (ret == -1) {
                 if (errno == EINTR) {
-                    perror("'select' was interrupted, try again");
-                    continue;
+                    perror("'select' was interrupted");
+					goto err_close;
                 } else {
                     perror("'select' problem");
                     goto err_close;
@@ -73,25 +69,33 @@ int drm_server_auth(drm_magic_t magic)
 
             if (FD_ISSET(sockfd, &rset)) {
 
-                bzero(buffer, sizeof(buffer));
-                ret = read(sockfd, buffer, sizeof(buffer));
+                bzero(rx_buf, sizeof(rx_buf));
+                ret = read(sockfd, rx_buf, sizeof(rx_buf));
                 if (ret <= 0) {
                     perror("could not receive answer from server");
 					ret = -1;
                     goto err_close;
                 }
 
-                fprintf(stdout, "got server response: [%s]\n", buffer);
+                fprintf(stdout, "got server response: [%s]\n", rx_buf);
 
-                if (0 == strncmp(buffer, DRM_AUTH_OK, strlen(DRM_AUTH_OK))) {
-                    fprintf(stdout, "ok, authentication successful\n");
-					ret = 0;
-                    break;
-                } else {
-                    fprintf(stdout, "authentication failed\n");
+				ret = sscanf(rx_buf, "%d:%d", &mag, &val);
+
+				if (ret < 2) {
+					perror("incomplete response from server");
 					ret = -1;
-                    goto err_close;
-                }
+					goto err_close;
+				}
+#if 0
+				if (mag != magic) {
+					perror("invalid destination in response");
+					ret = -1;
+					goto err_close;
+				}
+#endif
+                fprintf(stdout, "ok, got response %d\n", val);
+				ret = val;
+				goto err_close;
 
             } else {
                 fprintf(stdout, "hmm... should not happen... lets try one more cycle\n");

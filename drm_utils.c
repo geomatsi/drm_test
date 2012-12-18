@@ -272,6 +272,57 @@ drm_free_connector:
 	return false;
 }
 
+drmModeModeInfo * drm_get_mode_by_name(int fd, uint32_t connector_id, char *mode_name)
+{
+	drmModeConnector *connector;
+    drmModeRes *resources;
+	drmModeModeInfo *mode;
+
+	int i;
+
+	resources = drmModeGetResources(fd);
+	if (!resources) {
+		fprintf(stderr, "drmModeGetResources failed\n");
+		return NULL;
+	}
+
+    /* find connected connector */
+
+	for (i = 0; i < resources->count_connectors; i++) {
+		connector = drmModeGetConnector(fd, resources->connectors[i]);
+		if (!connector)
+			continue;
+
+		if (connector->connector_id == connector_id)
+			break;
+
+		drmModeFreeConnector(connector);
+	}
+
+	if (i == resources->count_connectors) {
+		fprintf(stderr, "No proper connector found\n");
+		return NULL;
+	}
+
+    /* find mode by name */
+
+    for (i = 0, mode = connector->modes; i < connector->count_modes; i++, mode++) {
+        if (0 == strcmp(mode->name, mode_name))
+            break;
+    }
+
+	if (i == connector->count_modes) {
+        fprintf(stderr, "No selected mode\n");
+		return NULL;
+    }
+
+	drmModeFreeConnector(connector);
+	drmModeFreeResources(resources);
+
+	return mode;
+}
+
+
 void dump_drm_configuration(struct kms_display *kms)
 {
     printf("setting mode \"%s\" on connector %d, encoder %d, crtc %d\n",
