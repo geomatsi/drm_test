@@ -35,6 +35,9 @@
 	CMD_CRTC
 		| magic:uint32_t | command:uint32_t | crtc_id:uint32_t | connector_id:uint32_t | fb:uint32_t | mode |
 
+	CMD_PLANE
+		| magic:uint32_t | command:uint32_t | crtc_id:uint32_t | plane_id:uint32_t | fb:uint32_t | w:uint32_t | h:uint32_t |
+
 */
 
 /* response:
@@ -48,7 +51,9 @@
 enum {
 	CMD_AUTH,
 	CMD_CRTC,
-	CMD_QUIT,
+	CMD_PLANE,
+	CMD_CRTC_STOP,
+	CMD_PLANE_STOP,
 };
 
 /* server responses */
@@ -66,6 +71,9 @@ struct drm_client_info {
     drmModeCrtcPtr current_crtc;
 	uint32_t crtc_id;
 	uint32_t conn_id;
+	uint32_t plane_id;
+	uint32_t w;
+	uint32_t h;
 	uint32_t fb;
 	char mode_name[20];
 	drmModeModeInfo *mode;

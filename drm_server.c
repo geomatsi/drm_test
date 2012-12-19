@@ -262,7 +262,35 @@ int main(char argc, char *argv[])
 
 					break;
 
-				case CMD_QUIT:	/* client disconnects */
+				case CMD_PLANE:	/* setup plane */
+					do {
+						uint32_t a, b;
+
+						sscanf(rx_buf, "%d:%d:%d:%d:%d:%d:%d", &a, &b,
+							&drm_clients[i].crtc_id, &drm_clients[i].plane_id,
+							&drm_clients[i].fb, drm_clients[i].w, drm_clients[i].h);
+
+						fprintf(stdout, "got req: %d:%d:%d:%d:%d:%d:%d\n", a, b,
+							drm_clients[i].crtc_id, drm_clients[i].plane_id,
+							drm_clients[i].fb, drm_clients[i].w, drm_clients[i].h);
+
+						ret = drmModeSetPlane(fd, drm_clients[i].plane_id, drm_clients[i].crtc_id,
+								drm_clients[i].fb, 0, 32, 32, drm_clients[i].w, drm_clients[i].h,
+								0, 0, drm_clients[i].w << 16, drm_clients[i].h << 16);
+
+						if (ret) {
+							perror("cannot set plane");
+							ret = -1;
+							break;
+						}
+
+						bzero(tx_buf, sizeof(tx_buf));
+						snprintf(tx_buf, sizeof(tx_buf), "%d:%d", magic, DRM_OK);
+					} while (0);
+
+					break;
+
+				case CMD_CRTC_STOP:	/* client disconnects */
 					do {
 
 						if (drm_clients[i].saved_crtc->mode_valid) {
@@ -276,6 +304,25 @@ int main(char argc, char *argv[])
 								ret = -1;
 								break;
 							}
+						}
+
+						bzero(tx_buf, sizeof(tx_buf));
+						snprintf(tx_buf, sizeof(tx_buf), "%d:%d", magic, DRM_OK);
+					} while (0);
+
+					break;
+
+				case CMD_PLANE_STOP:	/* client disconnects */
+					do {
+
+
+						ret = drmModeSetPlane(fd, drm_clients[i].plane_id,
+								0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+						if (ret) {
+							perror("failed drmModeSetCrtc(restore original)");
+							ret = -1;
+							break;
 						}
 
 						bzero(tx_buf, sizeof(tx_buf));

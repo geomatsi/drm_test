@@ -52,6 +52,9 @@ int main(char argc, char *argv[])
 		KMS_TERMINATE_PROP_LIST
 	};
 
+	drmModePlaneRes *resources;
+	drmModePlane *plane;
+
 	/* net vars */
 
 	struct sockaddr_un  serv_addr;
@@ -110,9 +113,25 @@ int main(char argc, char *argv[])
 
 	dump_drm_configuration(&kms_data);
 
+	// get plane
+	resources = drmModeGetPlaneResources(fd);
+	if (!resources || resources->count_planes == 0) {
+		fprintf(stderr, "drmModeGetPlaneResources failed\n");
+		ret = -ENODEV;
+		goto err_close_drm;
+	}
+
+	plane = drmModeGetPlane(fd, resources->planes[0]);
+
+	if (!plane) {
+		fprintf(stderr, "drmModeGetPlane failed\n");
+		ret = -ENODEV;
+		goto err_close_drm;
+	}
+
 	// set display dimensions for chosen configuration
-	attr[1] = kms_data.mode->hdisplay;
-	attr[3] = kms_data.mode->vdisplay;
+	attr[1] = 800; //kms_data.mode->hdisplay;
+	attr[3] = 480; //kms_data.mode->vdisplay;
 
 	// create kms driver
 	ret = kms_create(fd, &drv);
@@ -226,49 +245,28 @@ int main(char argc, char *argv[])
 			switch (command) {
 				case CMD_AUTH:
 #if 0
-					/* store current crtc */
-
-					saved_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
-					if (saved_crtc == NULL) {
-						perror("failed drmModeGetCrtc(current)");
-						goto err_buffer_unmap;
-					}
-
-					dump_crtc_configuration("saved_crtc", saved_crtc);
-
-					/* setup new crtc */
-
-					ret = drmModeSetCrtc(fd, kms_data.crtc->crtc_id, fb, 0, 0,
-							&kms_data.connector->connector_id, 1, kms_data.mode);
-
+					ret = drmModeSetPlane(fd, plane->plane_id, kms_data.crtc->crtc_id,
+							dbo.fb, 0, 32, 32, dbo.w, dbo.h, 0, 0, dbo.w << 16, dbo.h << 16);
 					if (ret) {
-						perror("failed drmModeSetCrtc(new)");
-						goto err_buffer_unmap;
-					}
-
-					current_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
-
-					if (current_crtc != NULL) {
-						dump_crtc_configuration("current_crtc", current_crtc);
-					} else {
-						perror("failed drmModeGetCrtc(new)");
+						fprintf(stderr, "cannot set plane\n");
+						return ret;
 					}
 #else
-					command = CMD_CRTC;
+					command = CMD_PLANE;
 					bzero(tx_buf, sizeof(tx_buf));
-					snprintf(tx_buf, sizeof(tx_buf), "%d:%d:%d:%d:%d:%s", magic, command,
-							kms_data.crtc->crtc_id, kms_data.connector->connector_id, fb, kms_data.mode->name);
+					snprintf(tx_buf, sizeof(tx_buf), "%d:%d:%d:%d:%d:%d:%d", magic, command,
+							kms_data.crtc->crtc_id, plane->plane_id, fb, 800, 480);
 
 					ret = write(sockfd, tx_buf, sizeof(tx_buf));
 					if (ret < 0) {
-						perror("could not send crtc message to server");
+						perror("could not send plane message to server");
 						goto err_fb;
 					}
 #endif
 					break;
 
-				case CMD_CRTC:
-					draw_test_image((uint32_t *) dst, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
+				case CMD_PLANE:
+					draw_test_image((uint32_t *) dst, 800, 480);
 
 					/* FIXME: for some reason so far only vmware needed it */
 					drmModeDirtyFB(fd, fb, NULL, 0);
@@ -287,7 +285,7 @@ int main(char argc, char *argv[])
 						}
 					}
 #else
-					command = CMD_CRTC_STOP;
+					command = CMD_PLANE_STOP;
 					bzero(tx_buf, sizeof(tx_buf));
 					snprintf(tx_buf, sizeof(tx_buf), "%d:%d", magic, command);
 
@@ -299,7 +297,7 @@ int main(char argc, char *argv[])
 #endif
 					break;
 
-				case CMD_CRTC_STOP:
+				case CMD_PLANE_STOP:
 					fprintf(stdout, "server ok, quit...\n");
 					goto err_fb;
 
