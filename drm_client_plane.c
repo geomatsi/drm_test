@@ -167,7 +167,7 @@ int main(char argc, char *argv[])
 	}
 
 	// create drm framebuffer
-	ret = drmModeAddFB(fd, kms_data.mode->hdisplay, kms_data.mode->vdisplay, 24, 32, stride, handle, &fb);
+	ret = drmModeAddFB(fd, 800, 480, 24, 32, stride, handle, &fb);
 	if (ret) {
 		perror("failed drmModeAddFB()");
 		goto err_buffer_unmap;
