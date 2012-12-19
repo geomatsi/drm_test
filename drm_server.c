@@ -268,7 +268,7 @@ int main(char argc, char *argv[])
 
 						sscanf(rx_buf, "%d:%d:%d:%d:%d:%d:%d", &a, &b,
 							&drm_clients[i].crtc_id, &drm_clients[i].plane_id,
-							&drm_clients[i].fb, drm_clients[i].w, drm_clients[i].h);
+							&drm_clients[i].fb, &drm_clients[i].w, &drm_clients[i].h);
 
 						fprintf(stdout, "got req: %d:%d:%d:%d:%d:%d:%d\n", a, b,
 							drm_clients[i].crtc_id, drm_clients[i].plane_id,
