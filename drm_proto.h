@@ -23,6 +23,7 @@
 #define DRM_SERVER_NAME	"/tmp/drm_srv"
 
 #define DRM_SRV_MSGLEN  1024
+#define MAXCLIENTS		5
 
 /* drm proto description */
 
@@ -66,7 +67,7 @@ struct drm_client_info {
 	uint32_t crtc_id;
 	uint32_t conn_id;
 	uint32_t fb;
-	char *mode_name;
+	char mode_name[20];
 	drmModeModeInfo *mode;
 };
 
