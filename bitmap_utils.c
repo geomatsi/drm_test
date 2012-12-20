@@ -2,6 +2,11 @@
 
 /* */
 
+void clear_image(uint32_t *dst, uint32_t width, uint32_t height)
+{
+	memset((void *) dst, 0x0, width*height*4);
+}
+
 void draw_test_image(uint32_t *dst, uint32_t w, uint32_t h)
 {
 
