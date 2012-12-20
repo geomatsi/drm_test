@@ -50,7 +50,6 @@ int main(char argc, char *argv[])
 	char tx_buf[DRM_SRV_MSGLEN + 1];
 	char rx_buf[DRM_SRV_MSGLEN + 1];
 	uint32_t command, magic;
-	uint32_t *pmsg;
 
 	/* setup signal handler */
 
@@ -175,7 +174,6 @@ int main(char argc, char *argv[])
 
 			/* handle drm client */
 
-			pmsg = (uint32_t *) rx_buf;
 			sscanf(rx_buf, "%d:%d", &magic, &command);
 			fprintf(stdout, "accepted request [%s] -> (%d, %d)\n", rx_buf, magic, command);
 
