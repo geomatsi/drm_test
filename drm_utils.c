@@ -301,6 +301,7 @@ drmModeModeInfo * drm_get_mode_by_name(int fd, uint32_t connector_id, char *mode
 
 	if (i == resources->count_connectors) {
 		fprintf(stderr, "No proper connector found\n");
+		drmModeFreeResources(resources);
 		return NULL;
 	}
 
@@ -313,12 +314,11 @@ drmModeModeInfo * drm_get_mode_by_name(int fd, uint32_t connector_id, char *mode
 
 	if (i == connector->count_modes) {
         fprintf(stderr, "No selected mode\n");
+		drmModeFreeConnector(connector);
 		return NULL;
     }
 
-	drmModeFreeConnector(connector);
 	drmModeFreeResources(resources);
-
 	return mode;
 }
 

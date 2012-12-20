@@ -29,14 +29,41 @@
 
 /* request:
 
-	CMD_AUTH
-		| magic:uint32_t | command:uint32_t |
+	CMD_AUTH = {
+		magic:uint32_t
+		command:uint32_t
+	}
 
-	CMD_CRTC
-		| magic:uint32_t | command:uint32_t | crtc_id:uint32_t | connector_id:uint32_t | fb:uint32_t | mode |
+	CMD_CRTC = {
+		magic:uint32_t
+		command:uint32_t
+		crtc_id:uint32_t
+		connector_id:uint32_t
+		fb:uint32_t
+		string:mode
+	}
 
-	CMD_PLANE
-		| magic:uint32_t | command:uint32_t | crtc_id:uint32_t | plane_id:uint32_t | fb:uint32_t | w:uint32_t | h:uint32_t |
+	CMD_CRTC_STOP = {
+		magic:uint32_t
+		command:uint32_t
+	}
+
+	CMD_PLANE = {
+		magic:uint32_t
+		command:uint32_t
+		crtc_id:uint32_t
+		plane_id:uint32_t
+		fb:uint32_t
+		w:uint32_t
+		h:uint32_t
+		x:uint32_t
+		y:uint32_t
+	}
+
+	CMD_PLANE_STOP = {
+		magic:uint32_t
+		command:uint32_t
+	}
 
 */
 
@@ -74,11 +101,11 @@ struct drm_client_info {
 	uint32_t plane_id;
 	uint32_t w;
 	uint32_t h;
+	uint32_t x;
+	uint32_t y;
 	uint32_t fb;
 	char mode_name[20];
 	drmModeModeInfo *mode;
 };
 
 /* */
-
-int drm_to_server(char *tx_buf);

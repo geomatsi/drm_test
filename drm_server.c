@@ -163,12 +163,14 @@ int main(char argc, char *argv[])
 				perror("problem with socket");
 				close(clients[i].fd);
 				clients[i].fd = -1;
+				continue;
 			}
 
 			if (ret == 0) {
 				fprintf(stdout, "client %d gone,closing connection\n", i);
 				close(clients[i].fd);
 				clients[i].fd = -1;
+				continue;
 			}
 
 			/* handle drm client */
@@ -233,10 +235,6 @@ int main(char argc, char *argv[])
 
 						/* setup new crtc */
 
-						fprintf(stdout, "XXXXX: %d, %d, %d, %s\n", drm_clients[i].crtc_id,
-						drm_clients[i].fb, drm_clients[i].conn_id,
-						drm_clients[i].mode->name);
-
 						ret = drmModeSetCrtc(fd, drm_clients[i].crtc_id, drm_clients[i].fb, 0, 0,
 								&drm_clients[i].conn_id, 1, drm_clients[i].mode);
 
@@ -266,17 +264,18 @@ int main(char argc, char *argv[])
 					do {
 						uint32_t a, b;
 
-						sscanf(rx_buf, "%d:%d:%d:%d:%d:%d:%d", &a, &b,
-							&drm_clients[i].crtc_id, &drm_clients[i].plane_id,
-							&drm_clients[i].fb, &drm_clients[i].w, &drm_clients[i].h);
+						sscanf(rx_buf, "%d:%d:%d:%d:%d:%d:%d:%d:%d", &a, &b,
+							&drm_clients[i].crtc_id, &drm_clients[i].plane_id, &drm_clients[i].fb,
+							&drm_clients[i].w, &drm_clients[i].h, &drm_clients[i].x, &drm_clients[i].y);
 
-						fprintf(stdout, "got req: %d:%d:%d:%d:%d:%d:%d\n", a, b,
-							drm_clients[i].crtc_id, drm_clients[i].plane_id,
-							drm_clients[i].fb, drm_clients[i].w, drm_clients[i].h);
+						fprintf(stdout, "got req: %d:%d:%d:%d:%d:%d:%d:%d:%d\n", a, b,
+							drm_clients[i].crtc_id, drm_clients[i].plane_id, drm_clients[i].fb,
+							drm_clients[i].w, drm_clients[i].h, drm_clients[i].x, drm_clients[i].y);
 
 						ret = drmModeSetPlane(fd, drm_clients[i].plane_id, drm_clients[i].crtc_id,
-								drm_clients[i].fb, 0, 32, 32, drm_clients[i].w, drm_clients[i].h,
-								0, 0, drm_clients[i].w << 16, drm_clients[i].h << 16);
+								drm_clients[i].fb, 0, drm_clients[i].x, drm_clients[i].y,
+								drm_clients[i].w, drm_clients[i].h, 0, 0,
+								drm_clients[i].w << 16, drm_clients[i].h << 16);
 
 						if (ret) {
 							perror("cannot set plane");

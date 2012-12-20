@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
@@ -30,19 +31,22 @@ int main(char argc, char *argv[])
 {
 	/* */
 
-	int ret;
+	int ret, opt, i, imt = 0;
 
 	/* drm vars */
 
-	struct kms_display kms_data;
 	struct kms_driver *drv;
 	struct kms_bo *bo;
 
-	uint32_t fb, stride, handle;
-	uint32_t *dst;
+	uint32_t plane_id = 0, crtc_id = 0;
+	uint32_t width = 0, height = 0;
+	uint32_t posx = 0, posy = 0;
+	int fb;
 	int fd;
 
-	drmModeCrtcPtr saved_crtc, current_crtc;
+	uint32_t stride, handle;
+	uint32_t *dst;
+
 	drm_magic_t magic;
 
 	uint32_t attr[] = {
@@ -53,7 +57,7 @@ int main(char argc, char *argv[])
 	};
 
 	drmModePlaneRes *resources;
-	drmModePlane *plane;
+	drmModePlane *plane = NULL;
 
 	/* net vars */
 
@@ -67,6 +71,46 @@ int main(char argc, char *argv[])
 	char tx_buf[DRM_SRV_MSGLEN + 1];
 
 	uint32_t command;
+
+	/* parse command line */
+
+	while ((opt = getopt(argc, argv, "t:x:y:w:v:c:p:m:h")) != -1) {
+		switch (opt) {
+			case 't':
+				imt = atoi(optarg);
+				break;
+			case 'x':
+				posx = atoi(optarg);
+				break;
+			case 'y':
+				posy = atoi(optarg);
+				break;
+			case 'w':
+				width = atoi(optarg);
+				break;
+			case 'v':
+				height = atoi(optarg);
+				break;
+			case 'p':
+				plane_id = atoi(optarg);
+				break;
+			case 'c':
+				crtc_id = atoi(optarg);
+				break;
+			case 'h':
+			default:
+				printf("usage: -h] -c <connector> -e <encoder> -m <mode>\n");
+				printf("\t-h: this help message\n");
+				printf("\t-c <crtc>			crtc id, default is 0\n");
+				printf("\t-p <plane>		plane id, default is 0\n");
+				printf("\t-x <posx>			plane top left corner xpos, default is 0'\n");
+				printf("\t-y <posy>			plane top left corner ypos, default is 0'\n");
+				printf("\t-w <width>		plane width, default is 0'\n");
+				printf("\t-v <height>		plane height, default is 0'\n");
+				printf("\t-t <image>		image type, default is 0\n");
+				exit(0);
+		}
+	}
 
 	/* init connection to server */
 
@@ -104,15 +148,6 @@ int main(char argc, char *argv[])
 		goto err_close_drm;
 	}
 
-	// parse command line to get DRM configuration
-	if (!drm_get_conf_cmdline(fd, &kms_data, argc, argv)) {
-		fprintf(stderr, "failed to get KMS settings from command line\n");
-		ret = -EINVAL;
-		goto err_close_drm;
-	}
-
-	dump_drm_configuration(&kms_data);
-
 	// get plane
 	resources = drmModeGetPlaneResources(fd);
 	if (!resources || resources->count_planes == 0) {
@@ -121,17 +156,28 @@ int main(char argc, char *argv[])
 		goto err_close_drm;
 	}
 
-	plane = drmModeGetPlane(fd, resources->planes[0]);
+	for (i = 0; i < resources->count_planes; i++) {
+		drmModePlane *p = drmModeGetPlane(fd, resources->planes[i]);
+		if (!p)
+			continue;
+
+		if (p->plane_id == plane_id) {
+			plane = p;
+			break;
+		}
+
+		drmModeFreePlane(plane);
+	}
 
 	if (!plane) {
-		fprintf(stderr, "drmModeGetPlane failed\n");
+		fprintf(stderr, "couldn't find specified plane\n");
 		ret = -ENODEV;
 		goto err_close_drm;
 	}
 
 	// set display dimensions for chosen configuration
-	attr[1] = 800; //kms_data.mode->hdisplay;
-	attr[3] = 480; //kms_data.mode->vdisplay;
+	attr[1] = width;
+	attr[3] = height;
 
 	// create kms driver
 	ret = kms_create(fd, &drv);
@@ -167,7 +213,7 @@ int main(char argc, char *argv[])
 	}
 
 	// create drm framebuffer
-	ret = drmModeAddFB(fd, 800, 480, 24, 32, stride, handle, &fb);
+	ret = drmModeAddFB(fd, width, height, 24, 32, stride, handle, &fb);
 	if (ret) {
 		perror("failed drmModeAddFB()");
 		goto err_buffer_unmap;
@@ -244,47 +290,30 @@ int main(char argc, char *argv[])
 
 			switch (command) {
 				case CMD_AUTH:
-#if 0
-					ret = drmModeSetPlane(fd, plane->plane_id, kms_data.crtc->crtc_id,
-							dbo.fb, 0, 32, 32, dbo.w, dbo.h, 0, 0, dbo.w << 16, dbo.h << 16);
-					if (ret) {
-						fprintf(stderr, "cannot set plane\n");
-						return ret;
-					}
-#else
 					command = CMD_PLANE;
 					bzero(tx_buf, sizeof(tx_buf));
-					snprintf(tx_buf, sizeof(tx_buf), "%d:%d:%d:%d:%d:%d:%d", magic, command,
-							kms_data.crtc->crtc_id, plane->plane_id, fb, 800, 480);
+					snprintf(tx_buf, sizeof(tx_buf), "%d:%d:%d:%d:%d:%d:%d:%d:%d",
+						magic, command, crtc_id, plane_id, fb, width, height, posx, posy);
 
 					ret = write(sockfd, tx_buf, sizeof(tx_buf));
 					if (ret < 0) {
 						perror("could not send plane message to server");
 						goto err_fb;
 					}
-#endif
+
 					break;
 
 				case CMD_PLANE:
-					draw_test_image((uint32_t *) dst, 800, 480);
+					if (imt)
+						draw_fancy_image((uint32_t *) dst, width, height);
+					else
+						draw_test_image((uint32_t *) dst, width, height);
 
 					/* FIXME: for some reason so far only vmware needed it */
 					drmModeDirtyFB(fd, fb, NULL, 0);
 
 					getchar();
 
-#if 0
-					/* restore original crtc settings */
-
-					if (saved_crtc->mode_valid) {
-						ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
-								saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
-
-						if (ret) {
-							perror("failed drmModeSetCrtc(restore original)");
-						}
-					}
-#else
 					command = CMD_PLANE_STOP;
 					bzero(tx_buf, sizeof(tx_buf));
 					snprintf(tx_buf, sizeof(tx_buf), "%d:%d", magic, command);
@@ -294,7 +323,7 @@ int main(char argc, char *argv[])
 						perror("could not send quit message to server");
 						goto err_fb;
 					}
-#endif
+
 					break;
 
 				case CMD_PLANE_STOP:
@@ -312,7 +341,7 @@ int main(char argc, char *argv[])
 	}
 
 err_fb:
-    drmModeRmFB(fd, fb);
+	drmModeRmFB(fd, fb);
 
 err_buffer_unmap:
 	ret = kms_bo_unmap(bo);

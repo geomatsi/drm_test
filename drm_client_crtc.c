@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <string.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -30,19 +31,23 @@ int main(char argc, char *argv[])
 {
 	/* */
 
-	int ret;
+	int ret, opt, imt = 0;
 
 	/* drm vars */
 
-	struct kms_display kms_data;
 	struct kms_driver *drv;
 	struct kms_bo *bo;
 
-	uint32_t fb, stride, handle;
+	drmModeModeInfo *mode;
+	char *mode_name;
+
+	uint32_t conn_id = 0, crtc_id = 0;
+	uint32_t stride, handle;
+	uint32_t width, height;
 	uint32_t *dst;
+	int fb;
 	int fd;
 
-	drmModeCrtcPtr saved_crtc, current_crtc;
 	drm_magic_t magic;
 
 	uint32_t attr[] = {
@@ -64,6 +69,34 @@ int main(char argc, char *argv[])
 	char tx_buf[DRM_SRV_MSGLEN + 1];
 
 	uint32_t command;
+
+	/* parse command line */
+
+	while ((opt = getopt(argc, argv, "t:n:c:m:h")) != -1) {
+		switch (opt) {
+			case 'm':
+				mode_name = strdup(optarg);
+				break;
+			case 'n':
+				conn_id = atoi(optarg);
+				break;
+			case 'c':
+				crtc_id = atoi(optarg);
+				break;
+			case 't':
+				imt = atoi(optarg);
+				break;
+			case 'h':
+			default:
+				printf("usage: -h] -c <connector> -e <encoder> -m <mode> -t <image type>\n");
+				printf("\t-h: this help message\n");
+				printf("\t-n <connector>	connector id, default is 0\n");
+				printf("\t-c <crtc>			crtc id, default is 0\n");
+				printf("\t-m <mode>			mode name, default is 'preferred'\n");
+				printf("\t-t <image>		image type, default is 0\n");
+				exit(0);
+		}
+	}
 
 	/* init connection to server */
 
@@ -101,18 +134,16 @@ int main(char argc, char *argv[])
 		goto err_close_drm;
 	}
 
-	// parse command line to get DRM configuration
-	if (!drm_get_conf_cmdline(fd, &kms_data, argc, argv)) {
-		fprintf(stderr, "failed to get KMS settings from command line\n");
-		ret = -EINVAL;
+	mode = drm_get_mode_by_name(fd, conn_id, mode_name);
+
+	if (!mode) {
+		perror("failed drm_get_mode_by_name");
 		goto err_close_drm;
 	}
 
-	dump_drm_configuration(&kms_data);
-
 	// set display dimensions for chosen configuration
-	attr[1] = kms_data.mode->hdisplay;
-	attr[3] = kms_data.mode->vdisplay;
+	attr[1] = width = mode->hdisplay;
+	attr[3] = height = mode->vdisplay;
 
 	// create kms driver
 	ret = kms_create(fd, &drv);
@@ -148,7 +179,7 @@ int main(char argc, char *argv[])
 	}
 
 	// create drm framebuffer
-	ret = drmModeAddFB(fd, kms_data.mode->hdisplay, kms_data.mode->vdisplay, 24, 32, stride, handle, &fb);
+	ret = drmModeAddFB(fd, width, height, 24, 32, stride, handle, &fb);
 	if (ret) {
 		perror("failed drmModeAddFB()");
 		goto err_buffer_unmap;
@@ -225,68 +256,31 @@ int main(char argc, char *argv[])
 
 			switch (command) {
 				case CMD_AUTH:
-#if 0
-					/* store current crtc */
-
-					saved_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
-					if (saved_crtc == NULL) {
-						perror("failed drmModeGetCrtc(current)");
-						goto err_buffer_unmap;
-					}
-
-					dump_crtc_configuration("saved_crtc", saved_crtc);
-
-					/* setup new crtc */
-
-					ret = drmModeSetCrtc(fd, kms_data.crtc->crtc_id, fb, 0, 0,
-							&kms_data.connector->connector_id, 1, kms_data.mode);
-
-					if (ret) {
-						perror("failed drmModeSetCrtc(new)");
-						goto err_buffer_unmap;
-					}
-
-					current_crtc = drmModeGetCrtc(fd, kms_data.crtc->crtc_id);
-
-					if (current_crtc != NULL) {
-						dump_crtc_configuration("current_crtc", current_crtc);
-					} else {
-						perror("failed drmModeGetCrtc(new)");
-					}
-#else
 					command = CMD_CRTC;
+
 					bzero(tx_buf, sizeof(tx_buf));
-					snprintf(tx_buf, sizeof(tx_buf), "%d:%d:%d:%d:%d:%s", magic, command,
-							kms_data.crtc->crtc_id, kms_data.connector->connector_id, fb, kms_data.mode->name);
+					snprintf(tx_buf, sizeof(tx_buf), "%d:%d:%d:%d:%d:%s",
+						magic, command, crtc_id, conn_id, fb, mode->name);
 
 					ret = write(sockfd, tx_buf, sizeof(tx_buf));
 					if (ret < 0) {
 						perror("could not send crtc message to server");
 						goto err_fb;
 					}
-#endif
+
 					break;
 
 				case CMD_CRTC:
-					draw_test_image((uint32_t *) dst, kms_data.mode->hdisplay, kms_data.mode->vdisplay);
+					if (imt)
+						draw_fancy_image((uint32_t *) dst, width, height);
+					else
+						draw_test_image((uint32_t *) dst, width, height);
 
 					/* FIXME: for some reason so far only vmware needed it */
 					drmModeDirtyFB(fd, fb, NULL, 0);
 
 					getchar();
 
-#if 0
-					/* restore original crtc settings */
-
-					if (saved_crtc->mode_valid) {
-						ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
-								saved_crtc->x, saved_crtc->y, &kms_data.connector->connector_id, 1, &saved_crtc->mode);
-
-						if (ret) {
-							perror("failed drmModeSetCrtc(restore original)");
-						}
-					}
-#else
 					command = CMD_CRTC_STOP;
 					bzero(tx_buf, sizeof(tx_buf));
 					snprintf(tx_buf, sizeof(tx_buf), "%d:%d", magic, command);
@@ -296,7 +290,7 @@ int main(char argc, char *argv[])
 						perror("could not send quit message to server");
 						goto err_fb;
 					}
-#endif
+
 					break;
 
 				case CMD_CRTC_STOP:
