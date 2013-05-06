@@ -25,8 +25,10 @@ if (WITH_LIBKMS)
 endif (WITH_LIBKMS)
 
 if (WITH_GL)
-    add_executable(drm_gl_double_buffer drm_gl_double_buffer.c drm_utils.c gl_utils.c)
-    add_executable(drm_gl_single_buffer drm_gl_single_buffer.c drm_utils.c gl_utils.c)
+    add_executable(drm_gl_test1a drm_gl_test1a.c drm_utils.c gl_utils.c)
+    add_executable(drm_gl_test1b drm_gl_test1b.c drm_utils.c gl_utils.c)
+    add_executable(drm_gl_test2 drm_gl_test2.c drm_utils.c gl_utils.c)
+    add_executable(drm_gl_test3 drm_gl_test3.c drm_utils.c gl_utils.c)
 endif (WITH_GL)
 
 # find headers
@@ -123,6 +125,8 @@ if (WITH_LIBKMS)
 endif (WITH_LIBKMS)
 
 if (WITH_GL)
-    target_link_libraries(drm_gl_double_buffer ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
-    target_link_libraries(drm_gl_single_buffer ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+    target_link_libraries(drm_gl_test1a ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+    target_link_libraries(drm_gl_test1b ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+    target_link_libraries(drm_gl_test2 ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
+    target_link_libraries(drm_gl_test3 ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
 endif (WITH_GL)

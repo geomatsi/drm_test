@@ -112,8 +112,8 @@ int main(int argc, char *argv[])
 	extensions = eglQueryString(dpy, EGL_EXTENSIONS);
 	printf("EGL_EXTENSIONS: %s\n", extensions);
 
-	if (!strstr(extensions, "EGL_KHR_surfaceless_opengl")) {
-		printf("No support for EGL_KHR_surfaceless_opengl\n");
+	if (!strstr(extensions, "EGL_KHR_surfaceless_context")) {
+		printf("No support for EGL_KHR_surfaceless_context\n");
 		ret = -1;
 		goto egl_terminate;
 	}
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 	/* create DRM framebuffer bound to gbm buffer object via opaque handler 'handle' */
 
 	handle = gbm_bo_get_handle(bo).u32;
-	stride = gbm_bo_get_pitch(bo);
+	stride = gbm_bo_get_stride(bo);
 
 	ret = drmModeAddFB(fd, kms.mode->hdisplay, kms.mode->vdisplay,
 			24, 32, stride, handle, &fb_id);

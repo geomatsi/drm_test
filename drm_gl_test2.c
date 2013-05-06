@@ -39,53 +39,55 @@
 #include "drm_utils.h"
 #include "gl_utils.h"
 
-#ifdef GL_OES_EGL_image
-static PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC glEGLImageTargetRenderbufferStorageOES_func;
-#endif
-
 static const char device_name[] = "/dev/dri/card0";
 
 int main(int argc, char *argv[])
 {
     EGLDisplay dpy;
     EGLContext ctx;
-    EGLImageKHR image[2];
     EGLint major, minor;
+    EGLConfig eglConfig;
+    EGLSurface eglSurface;
+
+    EGLint n = 0;
+
     const char *ver, *extensions;
 
     drmModeCrtcPtr saved_crtc;
     struct kms_display kms;
 
+    struct gbm_surface* surface;
     struct gbm_device *gbm;
-    struct gbm_bo *bo[2];
+    struct gbm_bo* bo = NULL;
 
-    uint32_t fb[2], color_rb, depth_rb;
     uint32_t handle, stride;
-    uint32_t fb_id[2];
-    uint32_t fbo;
+    uint32_t fb_id;
 
     float angle = 0.0;
-    uint32_t current;
     int ret, fd, i;
 
 	fd = open(device_name, O_RDWR);
 	if (fd < 0) {
-		/* Probably permissions error */
 		fprintf(stderr, "couldn't open %s, skipping\n", device_name);
 		return -1;
 	}
 
-	/* Find the first available KMS configuration */
+	/* */
 
-	if (!drm_autoconf(fd, &kms)) {
-		fprintf(stderr, "failed to setup KMS\n");
-		ret = -EFAULT;
-		goto close_fd;
-	}
+    if (argc > 1)
+        ret = drm_get_conf_cmdline(fd, &kms, argc, argv);
+    else
+        ret = drm_autoconf(fd, &kms);
+
+    if (ret == false) {
+        fprintf(stderr, "failed to setup KMS\n");
+        ret = -EFAULT;
+        goto close_fd;
+    }
 
     dump_drm_configuration(&kms);
 
-	/* Init EGL and create EGL context */
+	/* */
 
     gbm = gbm_create_device(fd);
     if (gbm == NULL) {
@@ -113,16 +115,39 @@ int main(int argc, char *argv[])
     extensions = eglQueryString(dpy, EGL_EXTENSIONS);
     printf("EGL_EXTENSIONS: %s\n", extensions);
 
-    if (!strstr(extensions, "EGL_KHR_surfaceless_opengl")) {
-        printf("No support for EGL_KHR_surfaceless_opengl\n");
+    if (!strstr(extensions, "EGL_KHR_surfaceless_context")) {
+        printf("No support for EGL_KHR_surfaceless_context\n");
         ret = -1;
         goto egl_terminate;
     }
 
     eglBindAPI(EGL_OPENGL_API);
 
-    ctx = eglCreateContext(dpy, NULL, EGL_NO_CONTEXT, NULL);
-    if (ctx == NULL) {
+    static const EGLint configAttribs[] = {
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+        EGL_RED_SIZE,   1,
+        EGL_GREEN_SIZE, 1,
+        EGL_BLUE_SIZE,  1,
+        EGL_ALPHA_SIZE, 0,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+        EGL_NONE
+    };
+
+    if (!eglChooseConfig(dpy, configAttribs, &eglConfig, 1, &n) || n != 1)
+    {
+        fprintf(stderr, "failed to choose config\n");
+        ret = -1;
+        goto egl_terminate;
+    }
+
+    EGLint contextAttrs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+
+    ctx = eglCreateContext(dpy, eglConfig, EGL_NO_CONTEXT, contextAttrs);
+    if (!ctx)
+    {
         fprintf(stderr, "failed to create context\n");
         ret = -1;
         goto egl_terminate;
@@ -134,68 +159,52 @@ int main(int argc, char *argv[])
         goto destroy_context;
     }
 
-#ifdef GL_OES_EGL_image
-    glEGLImageTargetRenderbufferStorageOES_func =
-        (PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC)
-        eglGetProcAddress("glEGLImageTargetRenderbufferStorageOES");
-#else
-    fprintf(stderr, "GL_OES_EGL_image not supported at compile time\n");
-#endif
+    /* */
 
-	/*	Bind together DRM (gbm), EGL (image) and OpenGL (rfb, fb) enitities
-	 *		gbm buffer object <-> EGL image <-> GL renderbuffer
-	 */
+    surface = gbm_surface_create(gbm, kms.mode->hdisplay, kms.mode->vdisplay, GBM_BO_FORMAT_XRGB8888, GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-    glGenRenderbuffers(2, fb);
-
-    for(i = 0; i < 2; ++i) {
-
-        glBindRenderbuffer(GL_RENDERBUFFER, fb[i]);
-
-        bo[i] = gbm_bo_create(gbm, kms.mode->hdisplay, kms.mode->vdisplay,
-                    GBM_BO_FORMAT_XRGB8888,
-                    GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
-
-        if (bo[i] == NULL) {
-            fprintf(stderr, "failed to create gbm bo\n");
-            ret = -1;
-            goto unmake_current;
-        }
-
-        image[i] = eglCreateImageKHR(dpy, NULL, EGL_NATIVE_PIXMAP_KHR, bo[i], NULL);
-
-        if (image == EGL_NO_IMAGE_KHR) {
-            fprintf(stderr, "failed to create egl image\n");
-            ret = -1;
-            goto destroy_gbm_bo;
-        }
-
-        glEGLImageTargetRenderbufferStorageOES_func(GL_RENDERBUFFER, image[i]);
-
-        handle = gbm_bo_get_handle(bo[i]).u32;
-        stride = gbm_bo_get_pitch(bo[i]);
-
-        ret = drmModeAddFB(fd, kms.mode->hdisplay, kms.mode->vdisplay,
-			24, 32, stride, handle, &fb_id[i]);
-
-        if (ret) {
-            fprintf(stderr, "failed to create fb\n");
-            goto rm_rb;
-        }
-
+    if (!surface) {
+        fprintf(stderr, "failed to create gbm surface\n");
+        ret = -1;
+        goto unmake_current;
     }
 
-    current  = 0;
+    eglSurface = eglCreateWindowSurface(dpy, eglConfig, (EGLNativeWindowType) surface, NULL);
 
-    /*
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-							  GL_COLOR_ATTACHMENT0,
-							  GL_RENDERBUFFER,
-							  fb[current]);
-    */
+    if (eglSurface == EGL_NO_SURFACE) {
+        fprintf(stderr, "failed to create egl surface\n");
+        ret = -1;
+        goto unmake_current;
+    }
+
+    if (!eglMakeCurrent(dpy, eglSurface, eglSurface, ctx))
+    {
+        fprintf(stderr, "failed to make eglSurface[%d] current\n", i);
+        ret = -1;
+        goto unmake_current;
+    }
+
+    eglSwapBuffers(dpy, eglSurface);
+
+    bo = gbm_surface_lock_front_buffer(surface);
+    if (!bo)
+    {
+        fprintf(stderr, "failed to lock front buffer\n", i);
+        ret = -1;
+        goto unmake_current;
+    }
+
+    handle = gbm_bo_get_handle(bo).u32;
+    stride = gbm_bo_get_stride(bo);
+
+    ret = drmModeAddFB(fd, kms.mode->hdisplay, kms.mode->vdisplay, 24, 32, stride, handle, &fb_id);
+
+    if (ret) {
+        fprintf(stderr, "failed to create fb\n");
+        goto unmake_current;
+    }
+
+    gbm_surface_release_buffer(surface, bo);
 
     saved_crtc = drmModeGetCrtc(fd, kms.crtc->crtc_id);
     if (saved_crtc == NULL) {
@@ -207,7 +216,7 @@ int main(int argc, char *argv[])
 
 	/* set new crtc: display DRM framebuffer */
 
-    ret = drmModeSetCrtc(fd, kms.crtc->crtc_id, fb_id[current], 0, 0,
+    ret = drmModeSetCrtc(fd, kms.crtc->crtc_id, fb_id, 0, 0,
             &kms.connector->connector_id, 1, kms.mode);
 
     if (ret) {
@@ -215,38 +224,15 @@ int main(int argc, char *argv[])
         goto free_saved_crtc;
     }
 
-    for(i = 0; i < 50; i++) {
-
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-							  GL_COLOR_ATTACHMENT0,
-							  GL_RENDERBUFFER,
-							  fb[current]);
-
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    		fprintf(stderr, "glCheckFramebufferStatus() failed\n");
-	    }
-
-        /* FIXME: for some reason so far only vmware needed it */
-        drmModeDirtyFB(fd, fb_id[current], NULL, 0);
+    for(i = 0; i < 10; i++) {
 
         render_stuff(kms.mode->hdisplay, kms.mode->vdisplay, angle);
 
-        if (drmModePageFlip(fd, kms.crtc->crtc_id, fb_id[current], 0, NULL) < 0) {
-            fprintf(stderr, "queueing pageflip failed\n");
-    	} else {
-            fprintf(stderr, "queueing ok\n");
-        }
+        drmModeDirtyFB(fd, fb_id, NULL, 0);
 
-        /*
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-							  GL_COLOR_ATTACHMENT0,
-							  GL_RENDERBUFFER,
-							  0);
-        */
-
-        current ^= 1;
         angle += 1.0;
-        usleep(50000);
+        puts("press enter...");
+        getchar();
     }
 
     ret = drmModeSetCrtc(fd, saved_crtc->crtc_id, saved_crtc->buffer_id,
@@ -259,21 +245,8 @@ int main(int argc, char *argv[])
 
 free_saved_crtc:
     drmModeFreeCrtc(saved_crtc);
-rm_rb:
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-            GL_COLOR_ATTACHMENT0,
-            GL_RENDERBUFFER, 0);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glDeleteRenderbuffers(1, &fb[0]);
-    glDeleteRenderbuffers(1, &fb[1]);
 rm_fb:
-    drmModeRmFB(fd, fb_id[0]);
-    drmModeRmFB(fd, fb_id[1]);
-    eglDestroyImageKHR(dpy, image[0]);
-    eglDestroyImageKHR(dpy, image[1]);
-destroy_gbm_bo:
-    gbm_bo_destroy(bo[0]);
-    gbm_bo_destroy(bo[1]);
+    drmModeRmFB(fd, fb_id);
 unmake_current:
     eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 destroy_context:
