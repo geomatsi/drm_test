@@ -37,7 +37,7 @@ static const char device_name[] = "/dev/dri/card0";
 
 /* */
 
-int main(char argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	struct kms_display kms_data;
 	struct dumb_rb dbo;
