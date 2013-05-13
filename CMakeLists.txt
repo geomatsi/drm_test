@@ -130,3 +130,6 @@ if (WITH_GL)
     target_link_libraries(drm_gl_test2 ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
     target_link_libraries(drm_gl_test3 ${EGL_LIBRARY} ${DRM_LIBRARY} ${GBM_LIBRARY} ${GL_LIBRARY})
 endif (WITH_GL)
+
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall" )
+SET( CMAKE_C_FLAGS  "${CMAKE_CXX_FLAGS} -Wall" )
