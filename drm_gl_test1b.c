@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     struct gbm_device *gbm;
     struct gbm_bo *bo[2];
 
-    uint32_t fb[2], color_rb, depth_rb;
+    uint32_t fb[2];
     uint32_t handle, stride;
     uint32_t fb_id[2];
     uint32_t fbo;

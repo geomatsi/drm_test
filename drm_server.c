@@ -35,13 +35,13 @@ void int_handler(int);
 
 /* */
 
-int main(char argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	struct sockaddr_un  cli_addr, serv_addr;
 	int sockfd, clientfd, servlen;
 	socklen_t clilen;
 
-	int ret, fd, max, rc, i;
+	int ret, fd, rc, i;
 	struct sigaction act;
 
 	struct drm_client_info drm_clients[MAXCLIENTS];
