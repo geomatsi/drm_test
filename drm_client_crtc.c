@@ -27,7 +27,7 @@ static const char device_name[] = "/dev/dri/card0";
 
 /* */
 
-int main(char argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	/* */
 
@@ -45,7 +45,7 @@ int main(char argc, char *argv[])
 	uint32_t stride, handle;
 	uint32_t width, height;
 	uint32_t *dst;
-	int fb;
+	uint32_t fb;
 	int fd;
 
 	drm_magic_t magic;

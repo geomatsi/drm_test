@@ -25,7 +25,7 @@ static const char device_name[] = "/dev/dri/card0";
 
 /* */
 
-int main(char argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	struct kms_driver *drv;
 	struct kms_bo *bo;
@@ -174,7 +174,6 @@ int main(char argc, char *argv[])
         }
     }
 
-err_fb:
     drmModeRmFB(fd, fb);
 
 err_buffer_unmap:

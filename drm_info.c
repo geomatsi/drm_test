@@ -32,6 +32,7 @@
 #include <fcntl.h>
 
 #include <drm.h>
+#include <drm_fourcc.h>
 #include <xf86drmMode.h>
 
 /* */
@@ -90,6 +91,69 @@ struct type_name connector_type_names[] = {
 };
 
 type_name_fn(connector_type)
+
+struct type_name format_names[] = {
+	{ DRM_FORMAT_C8, "C8  " },
+	{ DRM_FORMAT_RGB332, "RGB8" },
+	{ DRM_FORMAT_BGR233, "BGR8" },
+	{ DRM_FORMAT_XRGB4444, "XR12" },
+	{ DRM_FORMAT_XBGR4444, "XB12" },
+	{ DRM_FORMAT_RGBX4444, "RX12" },
+	{ DRM_FORMAT_BGRX4444, "BX12" },
+	{ DRM_FORMAT_ARGB4444, "AR12" },
+	{ DRM_FORMAT_ABGR4444, "AB12" },
+	{ DRM_FORMAT_RGBA4444, "RA12" },
+	{ DRM_FORMAT_BGRA4444, "BA12" },
+	{ DRM_FORMAT_XRGB1555, "XR15" },
+	{ DRM_FORMAT_XBGR1555, "XB15" },
+	{ DRM_FORMAT_RGBX5551, "RX15" },
+	{ DRM_FORMAT_BGRX5551, "BX15" },
+	{ DRM_FORMAT_ARGB1555, "AR15" },
+	{ DRM_FORMAT_ABGR1555, "AB15" },
+	{ DRM_FORMAT_RGBA5551, "RA15" },
+	{ DRM_FORMAT_BGRA5551, "BA15" },
+	{ DRM_FORMAT_RGB565, "RG16" },
+	{ DRM_FORMAT_BGR565, "BG16" },
+	{ DRM_FORMAT_RGB888, "RG24" },
+	{ DRM_FORMAT_BGR888, "BG24" },
+	{ DRM_FORMAT_XRGB8888, "XR24" },
+	{ DRM_FORMAT_XBGR8888, "XB24" },
+	{ DRM_FORMAT_RGBX8888, "RX24" },
+	{ DRM_FORMAT_BGRX8888, "BX24" },
+	{ DRM_FORMAT_ARGB8888, "AR24" },
+	{ DRM_FORMAT_ABGR8888, "AB24" },
+	{ DRM_FORMAT_RGBA8888, "RA24" },
+	{ DRM_FORMAT_BGRA8888, "BA24" },
+	{ DRM_FORMAT_XRGB2101010, "XR30" },
+	{ DRM_FORMAT_XBGR2101010, "XB30" },
+	{ DRM_FORMAT_RGBX1010102, "RX30" },
+	{ DRM_FORMAT_BGRX1010102, "BX30" },
+	{ DRM_FORMAT_ARGB2101010, "AR30" },
+	{ DRM_FORMAT_ABGR2101010, "AB30" },
+	{ DRM_FORMAT_RGBA1010102, "RA30" },
+	{ DRM_FORMAT_BGRA1010102, "BA30" },
+	{ DRM_FORMAT_YUYV, "YUYV" },
+	{ DRM_FORMAT_YVYU, "YVYU" },
+	{ DRM_FORMAT_UYVY, "UYVY" },
+	{ DRM_FORMAT_VYUY, "VYUY" },
+	{ DRM_FORMAT_AYUV, "AYUV" },
+	{ DRM_FORMAT_NV12, "NV12" },
+	{ DRM_FORMAT_NV21, "NV21" },
+	{ DRM_FORMAT_NV16, "NV16" },
+	{ DRM_FORMAT_NV61, "NV61" },
+	{ DRM_FORMAT_YUV410, "YUV9" },
+	{ DRM_FORMAT_YVU410, "YVU9" },
+	{ DRM_FORMAT_YUV411, "YU11" },
+	{ DRM_FORMAT_YVU411, "YV11" },
+	{ DRM_FORMAT_YUV420, "YU12" },
+	{ DRM_FORMAT_YVU420, "YV12" },
+	{ DRM_FORMAT_YUV422, "YU16" },
+	{ DRM_FORMAT_YVU422, "YV16" },
+	{ DRM_FORMAT_YUV444, "YU24" },
+	{ DRM_FORMAT_YVU444, "YV24" },
+};
+
+type_name_fn(format)
 
 /* */
 
@@ -246,6 +310,10 @@ void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
 	printf("\nPlane [id = %u]\n", plane->plane_id);
 	printf("\tFB ID [id = %u]\n", plane->fb_id);
 	printf("\tcrtc ID [id = %u]\n", plane->crtc_id);
+
+	for (i = 0; i < plane->count_formats; i++)
+		printf("%s '%s'", i == 0 ? "\tFormats:" : ",", format_str(plane->formats[i]));
+	printf("\n");
 
 	printf("\tCRTC XxY %ux%x\n", plane->crtc_x, plane->crtc_y);
 	printf("\tXxY %ux%x\n", plane->x, plane->y);
