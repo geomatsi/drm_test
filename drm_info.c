@@ -60,6 +60,10 @@ struct type_name encoder_type_names[] = {
 	{ DRM_MODE_ENCODER_TMDS, "TMDS" },
 	{ DRM_MODE_ENCODER_LVDS, "LVDS" },
 	{ DRM_MODE_ENCODER_TVDAC, "TVDAC" },
+	{ DRM_MODE_ENCODER_VIRTUAL, "VIRTUAL" },
+	{ DRM_MODE_ENCODER_DSI, "DSI" },
+	{ DRM_MODE_ENCODER_DPMST, "DPMST" },
+	{ DRM_MODE_ENCODER_DPI, "DPI" },
 };
 
 type_name_fn(encoder_type)
@@ -88,69 +92,115 @@ struct type_name connector_type_names[] = {
 	{ DRM_MODE_CONNECTOR_HDMIB, "HDMI-B" },
 	{ DRM_MODE_CONNECTOR_TV, "TV" },
 	{ DRM_MODE_CONNECTOR_eDP, "embedded displayport" },
+	{ DRM_MODE_CONNECTOR_VIRTUAL, "virtual" },
+	{ DRM_MODE_CONNECTOR_DSI, "DSI" },
+	{ DRM_MODE_CONNECTOR_DPI, "DPI" },
+	{ DRM_MODE_CONNECTOR_WRITEBACK, "writeback" },
 };
 
 type_name_fn(connector_type)
 
 struct type_name format_names[] = {
-	{ DRM_FORMAT_C8, "C8  " },
-	{ DRM_FORMAT_RGB332, "RGB8" },
-	{ DRM_FORMAT_BGR233, "BGR8" },
-	{ DRM_FORMAT_XRGB4444, "XR12" },
-	{ DRM_FORMAT_XBGR4444, "XB12" },
-	{ DRM_FORMAT_RGBX4444, "RX12" },
-	{ DRM_FORMAT_BGRX4444, "BX12" },
-	{ DRM_FORMAT_ARGB4444, "AR12" },
-	{ DRM_FORMAT_ABGR4444, "AB12" },
-	{ DRM_FORMAT_RGBA4444, "RA12" },
-	{ DRM_FORMAT_BGRA4444, "BA12" },
-	{ DRM_FORMAT_XRGB1555, "XR15" },
-	{ DRM_FORMAT_XBGR1555, "XB15" },
-	{ DRM_FORMAT_RGBX5551, "RX15" },
-	{ DRM_FORMAT_BGRX5551, "BX15" },
-	{ DRM_FORMAT_ARGB1555, "AR15" },
-	{ DRM_FORMAT_ABGR1555, "AB15" },
-	{ DRM_FORMAT_RGBA5551, "RA15" },
-	{ DRM_FORMAT_BGRA5551, "BA15" },
-	{ DRM_FORMAT_RGB565, "RG16" },
-	{ DRM_FORMAT_BGR565, "BG16" },
-	{ DRM_FORMAT_RGB888, "RG24" },
-	{ DRM_FORMAT_BGR888, "BG24" },
-	{ DRM_FORMAT_XRGB8888, "XR24" },
-	{ DRM_FORMAT_XBGR8888, "XB24" },
-	{ DRM_FORMAT_RGBX8888, "RX24" },
-	{ DRM_FORMAT_BGRX8888, "BX24" },
-	{ DRM_FORMAT_ARGB8888, "AR24" },
-	{ DRM_FORMAT_ABGR8888, "AB24" },
-	{ DRM_FORMAT_RGBA8888, "RA24" },
-	{ DRM_FORMAT_BGRA8888, "BA24" },
-	{ DRM_FORMAT_XRGB2101010, "XR30" },
-	{ DRM_FORMAT_XBGR2101010, "XB30" },
-	{ DRM_FORMAT_RGBX1010102, "RX30" },
-	{ DRM_FORMAT_BGRX1010102, "BX30" },
-	{ DRM_FORMAT_ARGB2101010, "AR30" },
-	{ DRM_FORMAT_ABGR2101010, "AB30" },
-	{ DRM_FORMAT_RGBA1010102, "RA30" },
-	{ DRM_FORMAT_BGRA1010102, "BA30" },
+	{ DRM_FORMAT_C8, "C8" },
+	{ DRM_FORMAT_R8, "R8" },
+	{ DRM_FORMAT_R16, "R16" },
+	{ DRM_FORMAT_RG88, "RG88" },
+	{ DRM_FORMAT_GR88, "GR88" },
+	{ DRM_FORMAT_RG1616, "RG1616" },
+	{ DRM_FORMAT_GR1616, "GR1616" },
+	{ DRM_FORMAT_RGB332, "RGB332" },
+	{ DRM_FORMAT_BGR233, "BGR233" },
+	{ DRM_FORMAT_XRGB4444, "XRGB4444" },
+	{ DRM_FORMAT_XBGR4444, "XBGR4444" },
+	{ DRM_FORMAT_RGBX4444, "RGBX4444" },
+	{ DRM_FORMAT_BGRX4444, "BGRX4444" },
+	{ DRM_FORMAT_ARGB4444, "ARGB4444" },
+	{ DRM_FORMAT_ABGR4444, "ABGR4444" },
+	{ DRM_FORMAT_RGBA4444, "RGBA4444" },
+	{ DRM_FORMAT_BGRA4444, "BGRA4444" },
+	{ DRM_FORMAT_XRGB1555, "XRGB1555" },
+	{ DRM_FORMAT_XBGR1555, "XBGR1555" },
+	{ DRM_FORMAT_RGBX5551, "RGBX5551" },
+	{ DRM_FORMAT_BGRX5551, "BGRX5551" },
+	{ DRM_FORMAT_ARGB1555, "ARGB1555" },
+	{ DRM_FORMAT_ABGR1555, "ABGR1555" },
+	{ DRM_FORMAT_RGBA5551, "RGBA5551" },
+	{ DRM_FORMAT_BGRA5551, "BGRA5551" },
+	{ DRM_FORMAT_RGB565, "RGB565" },
+	{ DRM_FORMAT_BGR565, "BGR565" },
+	{ DRM_FORMAT_RGB888, "RGB888" },
+	{ DRM_FORMAT_BGR888, "BGR888" },
+	{ DRM_FORMAT_XRGB8888, "XRGB8888" },
+	{ DRM_FORMAT_XBGR8888, "XBGR8888" },
+	{ DRM_FORMAT_RGBX8888, "RGBX8888" },
+	{ DRM_FORMAT_BGRX8888, "BGRX8888" },
+	{ DRM_FORMAT_ARGB8888, "ARGB8888" },
+	{ DRM_FORMAT_ABGR8888, "ABGR8888" },
+	{ DRM_FORMAT_RGBA8888, "RGBA8888" },
+	{ DRM_FORMAT_BGRA8888, "BGRA8888" },
+	{ DRM_FORMAT_XRGB2101010, "XRGB2101010" },
+	{ DRM_FORMAT_XBGR2101010, "XBGR2101010" },
+	{ DRM_FORMAT_RGBX1010102, "RGBX1010102" },
+	{ DRM_FORMAT_BGRX1010102, "BGRX1010102" },
+	{ DRM_FORMAT_ARGB2101010, "ARGB2101010" },
+	{ DRM_FORMAT_ABGR2101010, "ABGR2101010" },
+	{ DRM_FORMAT_RGBA1010102, "RGBA1010102" },
+	{ DRM_FORMAT_BGRA1010102, "BGRA1010102" },
+	{ DRM_FORMAT_XRGB16161616F, "XRGB16161616F" },
+	{ DRM_FORMAT_XBGR16161616F, "XBGR16161616F" },
+	{ DRM_FORMAT_ARGB16161616F, "ARGB16161616F" },
+	{ DRM_FORMAT_ABGR16161616F, "ABGR16161616F" },
 	{ DRM_FORMAT_YUYV, "YUYV" },
 	{ DRM_FORMAT_YVYU, "YVYU" },
 	{ DRM_FORMAT_UYVY, "UYVY" },
 	{ DRM_FORMAT_VYUY, "VYUY" },
 	{ DRM_FORMAT_AYUV, "AYUV" },
+	{ DRM_FORMAT_XYUV8888, "XYUV8888" },
+	{ DRM_FORMAT_VUY888, "VUY888" },
+	{ DRM_FORMAT_VUY101010, "VUY101010" },
+	{ DRM_FORMAT_Y210, "Y210" },
+	{ DRM_FORMAT_Y212, "Y212" },
+	{ DRM_FORMAT_Y216, "Y216" },
+	{ DRM_FORMAT_Y410, "Y410" },
+	{ DRM_FORMAT_Y412, "Y412" },
+	{ DRM_FORMAT_Y416, "Y416" },
+	{ DRM_FORMAT_XVYU2101010, "XVYU2101010" },
+	{ DRM_FORMAT_XVYU12_16161616, "XVYU12_16161616" },
+	{ DRM_FORMAT_XVYU16161616, "XVYU16161616" },
+	{ DRM_FORMAT_Y0L0, "Y0L0" },
+	{ DRM_FORMAT_X0L0, "X0L0" },
+	{ DRM_FORMAT_Y0L2, "Y0L2" },
+	{ DRM_FORMAT_X0L2, "X0L2" },
+	{ DRM_FORMAT_YUV420_8BIT, "YUV420_8BIT" },
+	{ DRM_FORMAT_YUV420_10BIT, "YUV420_10BIT" },
+	{ DRM_FORMAT_XRGB8888_A8, "XRGB8888_A8" },
+	{ DRM_FORMAT_XBGR8888_A8, "XBGR8888_A8" },
+	{ DRM_FORMAT_RGBX8888_A8, "RGBX8888_A8" },
+	{ DRM_FORMAT_BGRX8888_A8, "BGRX8888_A8" },
+	{ DRM_FORMAT_RGB888_A8, "RGB888_A8" },
+	{ DRM_FORMAT_BGR888_A8, "BGR888_A8" },
+	{ DRM_FORMAT_RGB565_A8, "RGB565_A8" },
+	{ DRM_FORMAT_BGR565_A8, "BGR565_A8" },
 	{ DRM_FORMAT_NV12, "NV12" },
 	{ DRM_FORMAT_NV21, "NV21" },
 	{ DRM_FORMAT_NV16, "NV16" },
 	{ DRM_FORMAT_NV61, "NV61" },
-	{ DRM_FORMAT_YUV410, "YUV9" },
-	{ DRM_FORMAT_YVU410, "YVU9" },
-	{ DRM_FORMAT_YUV411, "YU11" },
-	{ DRM_FORMAT_YVU411, "YV11" },
-	{ DRM_FORMAT_YUV420, "YU12" },
-	{ DRM_FORMAT_YVU420, "YV12" },
-	{ DRM_FORMAT_YUV422, "YU16" },
-	{ DRM_FORMAT_YVU422, "YV16" },
-	{ DRM_FORMAT_YUV444, "YU24" },
-	{ DRM_FORMAT_YVU444, "YV24" },
+	{ DRM_FORMAT_NV24, "NV24" },
+	{ DRM_FORMAT_NV42, "NV42" },
+	{ DRM_FORMAT_P210, "P210" },
+	{ DRM_FORMAT_P010, "P010" },
+	{ DRM_FORMAT_P012, "P012" },
+	{ DRM_FORMAT_P016, "P016" },
+	{ DRM_FORMAT_YUV410, "YUV410" },
+	{ DRM_FORMAT_YVU410, "YVU410" },
+	{ DRM_FORMAT_YUV411, "YUV411" },
+	{ DRM_FORMAT_YVU411, "YVU411" },
+	{ DRM_FORMAT_YUV420, "YUV420" },
+	{ DRM_FORMAT_YVU420, "YVU420" },
+	{ DRM_FORMAT_YUV422, "YUV422" },
+	{ DRM_FORMAT_YVU422, "YVU422" },
+	{ DRM_FORMAT_YUV444, "YUV444" },
+	{ DRM_FORMAT_YVU444, "YVU444" },
 };
 
 type_name_fn(format)
@@ -182,7 +232,7 @@ void crtc_info(drmModeRes *resources, drmModeCrtc *crtc)
 
 	printf("\ncrtc [id = %u]\n", crtc->crtc_id);
 	printf("\tbuffer [id = %u]\n", crtc->buffer_id);
-	printf("\tposition: %xx%x @ %xx%x\n", crtc->width, crtc->height, crtc->x, crtc->y);
+	printf("\tposition: %ux%u @ %ux%u\n", crtc->width, crtc->height, crtc->x, crtc->y);
 	if (crtc->mode_valid)
 		printf("\tMode: valid [%s]\n", crtc->mode.name);
 	else
@@ -286,6 +336,48 @@ void encoder_info(drmModeRes *resources, drmModeEncoder *encoder, drmModeCrtc **
 	return;
 }
 
+void fb_info(drmModeRes *resources, drmModeFB *fb)
+{
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModeFB {
+		uint32_t fb_id;
+		uint32_t width, height;
+		uint32_t pitch;
+		uint32_t bpp;
+		uint32_t depth;
+		uint32_t handle;
+	} drmModeFB, *drmModeFBPtr;
+	*/
+
+	printf("\nFramebuffer [id = %u]\n", fb->fb_id);
+	printf("\tdimenstions: %ux%u\n", fb->width, fb->height);
+	printf("\tbpp: %u\n", fb->bpp);
+	printf("\tdepth: %u\n", fb->depth);
+}
+
+void fb2_info(drmModeRes *resources, drmModeFB2 *fb2)
+{
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModeFB2 {
+		uint32_t fb_id;
+		uint32_t width, height;
+		uint32_t pixel_format;
+		uint64_t modifier;
+		uint32_t flags;
+
+		uint32_t handles[4];
+		uint32_t pitches[4];
+		uint32_t offsets[4];
+	} drmModeFB2, *drmModeFB2Ptr;
+	*/
+
+	printf("\nFramebuffer [id = %u]\n", fb2->fb_id);
+	printf("\tdimenstions: %ux%u\n", fb2->width, fb2->height);
+	printf("\tpixel format: %s\n", format_str(fb2->pixel_format));
+}
+
 void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
 {
 	int i;
@@ -315,8 +407,8 @@ void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
 		printf("%s '%s'", i == 0 ? "\tFormats:" : ",", format_str(plane->formats[i]));
 	printf("\n");
 
-	printf("\tCRTC XxY %ux%x\n", plane->crtc_x, plane->crtc_y);
-	printf("\tXxY %ux%x\n", plane->x, plane->y);
+	printf("\tCRTC XxY %ux%u\n", plane->crtc_x, plane->crtc_y);
+	printf("\tXxY %ux%u\n", plane->x, plane->y);
 	printf("\tSupported crtc:");
 	for (i = 0; i < 31; i++)
 		if (plane->possible_crtcs & (1 << i)) {
@@ -356,6 +448,8 @@ int main(int argc, char *argv[])
     drmModeConnector *connector;
 	drmModeEncoder *encoder;
     drmModeRes *resources;
+	drmModeFB *fb;
+	drmModeFB2 *fb2;
 
     int i, fd, ret;
 
@@ -422,6 +516,23 @@ int main(int argc, char *argv[])
 
 		encoder_info(resources, encoder, crtcs);
         drmModeFreeEncoder(encoder);
+    }
+
+    for (i = 0; i < resources->count_crtcs; i++) {
+		if (crtcs[i] == NULL)
+			continue;
+
+        fb2 = drmModeGetFB2(fd, crtcs[i]->buffer_id);
+        if (fb2 != NULL) {
+			fb2_info(resources, fb2);
+			drmModeFreeFB2(fb2);
+		} else {
+			fb = drmModeGetFB(fd, crtcs[i]->buffer_id);
+			if (fb == NULL)
+				continue;
+			fb_info(resources, fb);
+			drmModeFreeFB(fb);
+		}
     }
 
 	planes_info(fd, crtcs);
