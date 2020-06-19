@@ -336,6 +336,48 @@ void encoder_info(drmModeRes *resources, drmModeEncoder *encoder, drmModeCrtc **
 	return;
 }
 
+void fb_info(drmModeRes *resources, drmModeFB *fb)
+{
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModeFB {
+		uint32_t fb_id;
+		uint32_t width, height;
+		uint32_t pitch;
+		uint32_t bpp;
+		uint32_t depth;
+		uint32_t handle;
+	} drmModeFB, *drmModeFBPtr;
+	*/
+
+	printf("\nFramebuffer [id = %u]\n", fb->fb_id);
+	printf("\tdimenstions: %ux%u\n", fb->width, fb->height);
+	printf("\tbpp: %u\n", fb->bpp);
+	printf("\tdepth: %u\n", fb->depth);
+}
+
+void fb2_info(drmModeRes *resources, drmModeFB2 *fb2)
+{
+	/* From xf86drmMode.h:
+
+	typedef struct _drmModeFB2 {
+		uint32_t fb_id;
+		uint32_t width, height;
+		uint32_t pixel_format;
+		uint64_t modifier;
+		uint32_t flags;
+
+		uint32_t handles[4];
+		uint32_t pitches[4];
+		uint32_t offsets[4];
+	} drmModeFB2, *drmModeFB2Ptr;
+	*/
+
+	printf("\nFramebuffer [id = %u]\n", fb2->fb_id);
+	printf("\tdimenstions: %ux%u\n", fb2->width, fb2->height);
+	printf("\tpixel format: %s\n", format_str(fb2->pixel_format));
+}
+
 void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
 {
 	int i;
@@ -406,6 +448,8 @@ int main(int argc, char *argv[])
     drmModeConnector *connector;
 	drmModeEncoder *encoder;
     drmModeRes *resources;
+	drmModeFB *fb;
+	drmModeFB2 *fb2;
 
     int i, fd, ret;
 
@@ -472,6 +516,23 @@ int main(int argc, char *argv[])
 
 		encoder_info(resources, encoder, crtcs);
         drmModeFreeEncoder(encoder);
+    }
+
+    for (i = 0; i < resources->count_crtcs; i++) {
+		if (crtcs[i] == NULL)
+			continue;
+
+        fb2 = drmModeGetFB2(fd, crtcs[i]->buffer_id);
+        if (fb2 != NULL) {
+			fb2_info(resources, fb2);
+			drmModeFreeFB2(fb2);
+		} else {
+			fb = drmModeGetFB(fd, crtcs[i]->buffer_id);
+			if (fb == NULL)
+				continue;
+			fb_info(resources, fb);
+			drmModeFreeFB(fb);
+		}
     }
 
 	planes_info(fd, crtcs);
