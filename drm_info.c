@@ -232,7 +232,7 @@ void crtc_info(drmModeRes *resources, drmModeCrtc *crtc)
 
 	printf("\ncrtc [id = %u]\n", crtc->crtc_id);
 	printf("\tbuffer [id = %u]\n", crtc->buffer_id);
-	printf("\tposition: %xx%x @ %xx%x\n", crtc->width, crtc->height, crtc->x, crtc->y);
+	printf("\tposition: %ux%u @ %ux%u\n", crtc->width, crtc->height, crtc->x, crtc->y);
 	if (crtc->mode_valid)
 		printf("\tMode: valid [%s]\n", crtc->mode.name);
 	else
@@ -365,8 +365,8 @@ void plane_info(drmModePlane *plane, drmModeCrtc **crtcs)
 		printf("%s '%s'", i == 0 ? "\tFormats:" : ",", format_str(plane->formats[i]));
 	printf("\n");
 
-	printf("\tCRTC XxY %ux%x\n", plane->crtc_x, plane->crtc_y);
-	printf("\tXxY %ux%x\n", plane->x, plane->y);
+	printf("\tCRTC XxY %ux%u\n", plane->crtc_x, plane->crtc_y);
+	printf("\tXxY %ux%u\n", plane->x, plane->y);
 	printf("\tSupported crtc:");
 	for (i = 0; i < 31; i++)
 		if (plane->possible_crtcs & (1 << i)) {
